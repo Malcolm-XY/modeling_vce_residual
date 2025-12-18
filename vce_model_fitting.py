@@ -1209,11 +1209,11 @@ if __name__ == '__main__':
     #                                                 'label_driven_mi', channel_manual_remove)
     
     # %% Fitting
-    fm_model, rcm_model = 'basic', 'differ' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
+    fm_model, rcm_model = 'basic', 'linear' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
     results_best, cis_best, _, cis_all = fitting_model_best(fm_model, rcm_model, 
-                                                                      ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=1)
+                                                            ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=1)
     
     # %% Insert reference (LDMI) and initial ci (CM)
     ci_initial_model = np.mean(cm_global_averaged, axis=0)

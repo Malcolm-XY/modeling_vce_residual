@@ -15,10 +15,10 @@ from models import models
 import feature_engineering
 from utils import utils_feature_loading
 
-from connectivity_matrix_rebuilding import cm_rebuilding_competing
+from vce_model_fitting_competing import cm_rebuilding_competing
 def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "auto", "type": "3d_euclidean"}, 
                                                 feature_cm='pcc', 
-                                                model='Generalized_Surface_Laplacian', model_config='basic', 
+                                                model='Generalized_Surface_Laplacian', model_fm='basic', model_rcm='linear',
                                                 param='fitted_results_competing(sub1_sub5_joint_band)', kernel_normalization=False,
                                                 subject_range=range(6,16), experiment_range=range(1,4), 
                                                 subnetworks_extract='separate_index', selection_rate=1,
@@ -29,7 +29,7 @@ def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "au
     dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
-    param = read_params(model, model_config, folder=param, method='competing')
+    param = read_params(model, model_fm, model_rcm, folder=param, method='competing')
     global para
     para = param
     
@@ -53,9 +53,9 @@ def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "au
         beta_global_averaged = fcs_global_averaged['beta']
         gamma_global_averaged = fcs_global_averaged['gamma']
         
-        alpha_global_averaged_rebuilded = cm_rebuilding_competing(alpha_global_averaged, dm, param, kernel_normalization)
-        beta_global_averaged_rebuilded = cm_rebuilding_competing(beta_global_averaged, dm, param, kernel_normalization)
-        gamma_global_averaged_rebuilded = cm_rebuilding_competing(gamma_global_averaged, dm, param, kernel_normalization)
+        alpha_global_averaged_rebuilded = cm_rebuilding_competing(alpha_global_averaged, dm, param, model, kernel_normalization)
+        beta_global_averaged_rebuilded = cm_rebuilding_competing(beta_global_averaged, dm, param, model, kernel_normalization)
+        gamma_global_averaged_rebuilded = cm_rebuilding_competing(gamma_global_averaged, dm, param, model, kernel_normalization)
         
         strength_alpha = np.sum(np.abs(alpha_global_averaged_rebuilded), axis=0)
         strength_beta = np.sum(np.abs(beta_global_averaged_rebuilded), axis=0)
@@ -93,9 +93,9 @@ def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "au
             gamma = features['gamma']
 
             # RCM
-            alpha_rebuilded = cm_rebuilding_competing(alpha, dm, param, kernel_normalization)
-            beta_rebuilded = cm_rebuilding_competing(beta, dm, param, kernel_normalization)
-            gamma_rebuilded = cm_rebuilding_competing(gamma, dm, param, kernel_normalization)
+            alpha_rebuilded = cm_rebuilding_competing(alpha, dm, param, model, kernel_normalization)
+            beta_rebuilded = cm_rebuilding_competing(beta, dm, param, model, kernel_normalization)
+            gamma_rebuilded = cm_rebuilding_competing(gamma, dm, param, model, kernel_normalization)
             
             # subnetworks
             alpha_rebuilded = alpha_rebuilded[:,channel_selects['alpha'],:][:,:,channel_selects['alpha']]
@@ -341,15 +341,9 @@ if __name__ == '__main__':
         #                                             feature_cm='pcc', subject_range=range(6, 16), 
         #                                             subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
         #                                             selection_rate=selection_rate, save=True)
-        
-        # # Competing; GSLF
-        # cnn_subnetworks_evaluation_circle_competing(model_config='basic', # 'basic'; 'advanced'
-        #                                             feature_cm='pcc', subject_range=range(6,16),
-        #                                             subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-        #                                             selection_rate=selection_rate, save=True)
-        
+
         # Competing; GSLF
-        cnn_subnetworks_evaluation_circle_competing(model_config='basic', # 'basic'; 'advanced'
+        cnn_subnetworks_evaluation_circle_competing(model_fm='basic', model_rcm='linear',
                                                     feature_cm='pcc', subject_range=range(6,16),
                                                     param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
                                                     kernel_normalization=True,

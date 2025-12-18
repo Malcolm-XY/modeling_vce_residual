@@ -4,14 +4,100 @@ Created on Wed Dec 17 13:32:51 2025
 
 @author: 18307
 """
-
+import os
+import h5py
 import numpy as np
+
+import mne
 import time
+
 from utils import utils_feature_loading, utils_eeg_loading
+def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_slf='slf', slf_kwargs=None):
+    """
+    Load, filter, and optionally save SEED dataset EEG data into frequency bands.
 
-dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
+    Parameters:
+    identifier (str): Identifier for the subject/session.
+    freq (int): SEED: 200 Hz. DREAMER: 128 Hz.
+    verbose (bool): If True, prints progress messages. Default is True.
+    save (bool): If True, saves the filtered EEG data to disk. Default is False.
 
-def surface_laplacian_filtering(eeg_data, sampling_rate, m=4, _lambda=1e-4, dataset='seed'):
+    Returns:
+    dict:
+        A dictionary where keys are frequency band names and values are the filtered MNE Raw objects.
+
+    Raises:
+    FileNotFoundError: If the SEED data file cannot be found.
+    """
+    # Load raw EEG data using the provided utility function
+    eeg = utils_eeg_loading.read_and_parse_seed(identifier)
+    
+    # Construct the output folder path for filtered data
+    base_path = os.path.abspath(os.path.join(os.getcwd(), "../../Research_Data/SEED/original eeg/Filtered_SLFed_EEG"))
+    os.makedirs(base_path, exist_ok=True)
+    
+    # Filter the EEG data into different frequency bands
+    filtered_eeg_dict = filter_eeg(eeg, freq=freq, verbose=verbose, apply_slf=apply_slf, slf_kwargs=slf_kwargs)
+    
+    # Save filtered EEG data if requested
+    if save:
+        for band, filtered_eeg in filtered_eeg_dict.items():
+            path_file = os.path.join(base_path, f"{identifier}_{band}_eeg.fif")
+            filtered_eeg.save(path_file, overwrite=True)
+            if verbose:
+                print(f"Saved {band} band filtered EEG to {path_file}")
+    
+    return filtered_eeg_dict
+
+def filter_eeg(eeg, freq=128, verbose=False, apply_slf=False, slf_kwargs=None):
+    """
+    先（可选）做 SLF，再用 MNE 分段滤波到 Delta/Theta/Alpha/Beta/Gamma。
+    """
+    eeg = np.asarray(eeg, dtype=float)
+    if eeg.ndim != 2:
+        raise ValueError(f"eeg must be (n_channels, n_samples), got {eeg.shape}")
+
+    if apply_slf == 'slf':
+        slf_kwargs = slf_kwargs or {}
+        eeg = surface_laplacian_filtering(
+            eeg_data=eeg,
+            sampling_rate=freq,   # SLF里不使用，但保留接口
+            **slf_kwargs
+        )
+        if verbose:
+            print("Applied SLF on broadband EEG (before bandpass).")
+    elif apply_slf == 'ssd':        
+        print('Test')
+
+    info = mne.create_info(
+        ch_names=[f"Ch{i}" for i in range(eeg.shape[0])],
+        sfreq=freq,
+        ch_types='eeg'
+    )
+    mne_eeg = mne.io.RawArray(eeg, info, verbose="ERROR")
+
+    freq_bands = {
+        "Delta": (0.5, 4),
+        "Theta": (4, 8),
+        "Alpha": (8, 13),
+        "Beta": (13, 30),
+        "Gamma": (30, 50),
+    }
+
+    band_filtered_eeg = {}
+    for band, (low_freq, high_freq) in freq_bands.items():
+        filtered_raw = mne_eeg.copy().filter(
+            l_freq=low_freq, h_freq=high_freq,
+            method="fir", phase="zero-double",
+            verbose="ERROR"
+        )
+        band_filtered_eeg[band] = filtered_raw
+        if verbose:
+            print(f"{band} band filtered: {low_freq}–{high_freq} Hz")
+
+    return band_filtered_eeg
+
+def surface_laplacian_filtering(eeg_data, sampling_rate, dist=None, m=4, _lambda=1e-4):
     """
     Surface Laplacian Filtering (Spherical Spline, Perrin-style).
 
@@ -34,7 +120,6 @@ def surface_laplacian_filtering(eeg_data, sampling_rate, m=4, _lambda=1e-4, data
         Surface Laplacian (spatial second derivative) of EEG, shape (channels, time_samples).
     """
     # ---- load electrode coordinates ----
-    dist = utils_feature_loading.read_distribution(dataset, 'auto', header=True)
     x = np.asarray(dist['x'], dtype=float).ravel()
     y = np.asarray(dist['y'], dtype=float).ravel()
     z = np.asarray(dist['z'], dtype=float).ravel()
@@ -124,6 +209,13 @@ def surface_laplacian_filtering(eeg_data, sampling_rate, m=4, _lambda=1e-4, data
     eeg_data_filtered = H @ w  # (n_ch, n_t)
 
     return eeg_data_filtered
+
+dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
+filtered_eeg_dict = filter_eeg_seed('sub1ex1', freq=200, save=True, verbose=True,
+                                    apply_slf='slf', slf_kwargs={"dist": dist, "m": 4, "_lambda": 1e-4})
+
+
+
 
 from scipy import signal
 def ssd_filtering(eeg_data, sampling_rate, 
@@ -250,66 +342,7 @@ def ssd_filtering(eeg_data, sampling_rate,
     
     return eeg_data_filtered, S, W, A, evals, meta
 
-def ged_filtering(eeg_data, C1, C2, n_components=6):
-    """
-    Generic GED projection: solve C1 w = lambda C2 w.
-
-    Parameters
-    ----------
-    eeg_data : np.ndarray
-        (channels, time)
-    C1, C2 : np.ndarray
-        Covariance matrices (channels, channels)
-    n_components : int
-        Number of components to return (largest eigenvalues).
-
-    Returns
-    -------
-    S : np.ndarray
-        Components (n_components, time)
-    W : np.ndarray
-        Filters (channels, n_components)
-    A : np.ndarray
-        Patterns (channels, n_components)
-    evals : np.ndarray
-        Eigenvalues (channels,)
-    """
-    def _ged(Cs, Cn):
-        """
-        Solve Cs w = lambda Cn w.
-        Returns eigenvalues (desc) and eigenvectors.
-        """
-        # Whiten Cn: Cn = U diag(d) U^T
-        d, U = np.linalg.eigh(Cn)
-        eps = 1e-12
-        d = np.maximum(d, eps)
-        Wn = U @ np.diag(1.0 / np.sqrt(d)) @ U.T  # whitening matrix
-
-        M = Wn @ Cs @ Wn.T
-        evals, evecs = np.linalg.eigh(M)
-        idx = np.argsort(evals)[::-1]
-        evals = evals[idx]
-        evecs = evecs[:, idx]
-
-        # back-project to original space
-        W = Wn.T @ evecs
-        return evals, W
-    
-    X = np.asarray(eeg_data, dtype=float)
-    if X.ndim != 2:
-        raise ValueError(f"eeg_data must be (channels, time), got {X.shape}")
-
-    evals, W_full = _ged(C1, C2)
-
-    k = min(n_components, X.shape[0])
-    W = W_full[:, :k]
-    S = W.T @ X
-
-    A = np.linalg.pinv(W).T
-    
-    eeg_data_filtered = A @ S
-    return eeg_data_filtered, S, W, A, evals
-
+# %% save
 import os
 import h5py
 def save_results(dataset, feature, identifier, data, extension='slf'):
@@ -329,6 +362,7 @@ def save_results(dataset, feature, identifier, data, extension='slf'):
 
     print(f"Data saved to {file_path}")
 
+# %%
 from feature_engineering import compute_corr_matrices
 def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experiment_range=range(1, 2),
                  feature='pcc', band='joint', method='slf', save=False, verbose=True):
@@ -402,8 +436,6 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
                     eeg_data_filtered = surface_laplacian_filtering(data, sampling_rate, dataset=dataset)
                 elif method == 'ssd':
                     eeg_data_filtered,_,_,_,_,_ = ssd_filtering(data, sampling_rate)
-                elif method == 'ged':
-                    eeg_data_filtered,_,_,_,_,_ = ged_filtering(data, C1, C2, n_components=6)
                 
                 if feature == 'pcc':
                     result = compute_corr_matrices(eeg_data_filtered, sampling_rate)    
@@ -431,5 +463,6 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
 
     return eeg_data_filtered
 
-fc_matrices = fc_matrices_circle_vc_filtering('seed', subject_range=range(1, 16), experiment_range=range(1, 4),
-                                              method='ged', band='joint', save=True, verbose=True)
+# dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
+# fc_matrices = fc_matrices_circle_vc_filtering('seed', subject_range=range(1, 16), experiment_range=range(1, 4),
+#                                               method='ged', band='joint', save=True, verbose=True)

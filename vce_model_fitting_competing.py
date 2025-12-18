@@ -8,15 +8,12 @@ Created on Thu Nov  6 19:54:49 2025
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.ndimage import gaussian_filter
 
 import feature_engineering
 
 # %%
-import vce_model_fitting
-def cm_rebuilding_competing(cms, distance_matrix, params, model='generalized_surface_laplacian', 
-                            model_fm='basic', model_rcm='linear',
-                            fm_normalization=True, rcm_normalization=False):
+def cm_rebuilding_competing(cms, distance_matrix, params, method='generalized_surface_laplacian', 
+                            model_fm='basic', fm_normalization=True):
     """
     重建功能连接矩阵（Reconstructed Connectivity Matrices, RCM）。
 
@@ -28,55 +25,29 @@ def cm_rebuilding_competing(cms, distance_matrix, params, model='generalized_sur
     返回：
         cms_rebuilt (np.ndarray): 重建后的功能连接矩阵，形状为 (N, H, W)
     """
-    scale_a = params.get('scale_a', 0)
-    scale_b = params.get('scale_b', 0)
-
     # 计算距离衰减因子矩阵
     cms_rebuilt = []
     
     if len(cms.shape) == 2:
-        cms_rebuilt = compute_volume_conduction_factors_advanced_model(distance_matrix, cms, method=model, params=params)
+        cms_rebuilt = compute_volume_conduction_factors_advanced_model(distance_matrix, cms, method, params)
         return cms_rebuilt
     
     elif len(cms.shape) == 3:
-        for i, cm in enumerate(cms):
+        for i, _cm in enumerate(cms):
             # Apply filtering or model-based reconstruction
-            cm_rebuilt = compute_volume_conduction_factors_advanced_model(distance_matrix, cm, method=model, params=params)
-            
-            # Optional normalization (to ensure comparable scales)
-            if rcm_normalization:
-                norm = np.linalg.norm(cm_rebuilt, ord='fro')
-                if norm > 0:
-                    cm_rebuilt = cm_rebuilt / norm
-    
+            cm_rebuilt = compute_volume_conduction_factors_advanced_model(distance_matrix, _cm, method, params)
             cms_rebuilt.append(cm_rebuilt)
         
         # Stack results along the first dimension
         cms_rebuilt = np.stack(cms_rebuilt, axis=0)
         
-    temp_matrix = cms_rebuilt
-        
     if fm_normalization:
-        factor_matrix = feature_engineering.normalize_matrix(temp_matrix)
-    
-    # 重建
-    if model_rcm == 'differ':
-        cms_rebuilt = cms - factor_matrix
-    elif model_rcm == 'linear':
-        cms_rebuilt = cms + scale_a * factor_matrix
-    elif model_rcm == 'linear_ratio':
-        e = 1e-6
-        smoothed_fm = vce_model_fitting.gaussian_filter(factor_matrix, sigma=1)
-        cms_rebuilt = cms + scale_a * factor_matrix + scale_b * cms / (smoothed_fm + e)
-
-    # 归一化（支持批处理）
-    if rcm_normalization:
-        cms_rebuilt = feature_engineering.normalize_matrix(np.abs(cms_rebuilt))
+        cms_rebuilt = feature_engineering.normalize_matrix(cms_rebuilt)
 
     return cms_rebuilt
 
 def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connectivity_matrix,
-                                                     method='generalized_surface_laplacian', params=None):
+                                                     method='generalized_surface_laplacian', params=None, kernel_normalization=True):
     """
     基于距离矩阵计算体积电导效应的因子矩阵，支持多种模型和通用偏移参数:
     exponential, gaussian, inverse, cutoff, powerlaw, rational_quadratic, generalized_gaussian, sigmoid
@@ -93,8 +64,6 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connecti
     Returns:
         numpy.ndarray: 因子矩阵，与 distance_matrix 同形状
     """
-    import numpy as np
-
     _distance_matrix = np.asarray(_distance_matrix)
 
     # 默认参数集合，增加 deviation 和 offset
@@ -117,38 +86,26 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connecti
         # 若提供了参数，则在默认参数基础上更新
         params = {**default_params[method], **params}
 
-    # 通用参数
-    deviation = params.get('deviation', 0.0)
-    offset = params.get('offset', 0.0)
-    
-    # -------------------test
-    # print(f"deviation: {deviation}; offset: {offset}")
-    
-    _d = _distance_matrix + deviation  # 统一偏移
-    # epsilon = 1e-6  # 防止除0或log0
-
     # 初始化结果矩阵
     factor_matrix = np.zeros_like(_distance_matrix)
 
     if method == 'generalized_surface_laplacian':
-        cm_recovered = apply_generalized_surface_laplacian_filtering(_connectivity_matrix, _d,
-                                                                     filtering_params=params)
-        factor_matrix = cm_recovered + offset
+        cm_recovered = apply_generalized_surface_laplacian_filtering(_connectivity_matrix, _distance_matrix,
+                                                                     filtering_params=params, kernel_normalization=kernel_normalization)
 
     elif method == 'graph_laplacian_filtering':
-        cm_recovered =  apply_graph_laplacian_filtering(_connectivity_matrix, _d,
-                                                        filtering_params=params, kernel_normalization=False)
-        factor_matrix = cm_recovered + offset
+        cm_recovered =  apply_graph_laplacian_filtering(_connectivity_matrix, _distance_matrix,
+                                                        filtering_params=params, kernel_normalization=kernel_normalization)
 
     else:
         raise ValueError(f"不支持的体积电导建模方法: {method}")
 
     # 对角线置为1（自我连接）
     np.fill_diagonal(factor_matrix, 1.0)
-    return factor_matrix
+    return cm_recovered
 
-def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, filtering_params, 
-                                                  kernal_normalization=False, visualize=False):
+def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, 
+                                                  filtering_params, kernel_normalization):
     """
     向量化的 FN-Laplacian（边空间）实现：
     M' = M - neighbor_avg
@@ -157,17 +114,12 @@ def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, filte
     若 normalized=False，则分母省略，直接用加权和（更贴近未归一化拉普拉斯）。
     支持 knn 稀疏化以加速大规模 N。
     """
-    if visualize:
-        try:
-            utils_visualization.draw_projection(matrix, 'Before FN-Laplacian Filtering (fast)')
-        except Exception:
-            pass
 
     sigma = float(filtering_params.get('sigma', 0.1))
     deviation = filtering_params.get('deviation', 0.0)
     offset = filtering_params.get('offset', 0.0)
     knn = None # knn = filtering_params.get('knn', None)
-
+    
     M = np.array(matrix, dtype=float, copy=True)
     D = np.array(distance_matrix, dtype=float, copy=True) + deviation
     N = M.shape[0]
@@ -183,9 +135,9 @@ def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, filte
     np.fill_diagonal(W, 0.0)
     
     # normalization
-    if kernal_normalization:
-        W = W / W.sum(axis=1, keepdims=True) + 1e-12
-
+    if kernel_normalization:
+        W = W / (W.sum(axis=1, keepdims=True) + 1e-12)
+    
     # 3) 可选 kNN 稀疏化（每行只保留 k 个最大权重）
     if knn is not None and isinstance(knn, int) and knn > 0 and knn < N-1:
         # 对每一行，保留最大的 knn 个非对角元素
@@ -211,16 +163,10 @@ def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, filte
     # 8) 对称化
     M_filtered = 0.5 * (M_filtered + M_filtered.T)
 
-    if visualize:
-        try:
-            utils_visualization.draw_projection(M_filtered, 'After FN-Laplacian Filtering (fast)')
-        except Exception:
-            pass
-
     return M_filtered
 
 def apply_graph_laplacian_filtering(matrix, distance_matrix,
-                                    filtering_params, kernel_normalization=False):
+                                    filtering_params, kernel_normalization):
     matrix = np.array(matrix, dtype=float, copy=True)
     distance_matrix = np.array(distance_matrix, dtype=float, copy=True)
 
@@ -243,7 +189,7 @@ def apply_graph_laplacian_filtering(matrix, distance_matrix,
     laplacian_normalization = bool(filtering_params.get('laplacian_normalization', False))
     mode = str(filtering_params.get('mode', 'highpass')) # "lowpass" or "highpass"
     lateral_mode = str(filtering_params.get('lateral_mode', 'unilateral')) # 'unilateral' or 'bilateral'
-
+    
     # Avoid division by zero
     distance_matrix = np.where(distance_matrix == 0, 1e-6, distance_matrix)
 
@@ -252,7 +198,7 @@ def apply_graph_laplacian_filtering(matrix, distance_matrix,
     np.fill_diagonal(W, 0)
 
     if kernel_normalization:
-        W = W / W.sum(axis=1, keepdims=True) + 1e-12
+        W = W / (W.sum(axis=1, keepdims=True) + 1e-12)
     
     # Step 3: Compute Laplacian matrix L
     D = np.diag(W.sum(axis=1))
@@ -367,38 +313,18 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_1_5
     return electrodes, ci_target_smooth, distance_matrix, cm_global_averaged
 
 # Here utilized VCE Model/FM=M(DM) Model
-def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
+def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix):
     """
-    Compute ci_fitting based on selected RCM method: differ, linear, or linear_ratio.
+    Compute ci_fitting based.
     """
     # Step 1: Calculate FM
-    factor_matrix = compute_volume_conduction_factors_advanced_model(distance_matrix, connectivity_matrix, 
-                                                                     method, params=params_dict)
+    cm_recovered = compute_volume_conduction_factors_advanced_model(distance_matrix, connectivity_matrix, 
+                                                                    method, params=params_dict)
     
-    # *************************** here may should be revised 20250508
-    factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
-    
-    # Step 2: Calculate RCM
-    cm, fm = connectivity_matrix, factor_matrix
-    e = 1e-6  # Small value to prevent division by zero
-
-    if RCM == 'differ':
-        cm_recovered = cm - fm
-    elif RCM == 'linear':
-        scale_a = params_dict.get('scale_a', 1.0)
-        cm_recovered = cm + scale_a * fm
-    elif RCM == 'linear_ratio':
-        scale_a = params_dict.get('scale_a', 1.0)
-        scale_b = params_dict.get('scale_b', 1.0)
-        cm_recovered = cm + scale_a * fm + scale_b * cm / (gaussian_filter(fm, sigma=1) + e)
-    else:
-        raise ValueError(f"Unsupported RCM mode: {RCM}")
-    
-    # Step 3: Normalize RCM
+    # Step 2: Normalize RCM
     cm_recovered = feature_engineering.normalize_matrix(cm_recovered)
 
-    # Step 4: Compute CI
-    global ci_fitting
+    # Step 3: Compute CI
     ci_fitting = np.mean(cm_recovered, axis=0)
     ci_fitting = prune_ci(ci_fitting)
 
@@ -406,12 +332,12 @@ def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix
 
 # %% Optimization
 from scipy.optimize import differential_evolution
-def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix, RCM='differ'):
+def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix):
     res = differential_evolution(loss_fn, bounds=bounds, strategy='best1bin', maxiter=1000)
     params = dict(zip(param_keys, res.x))
     
     result = {'params': params, 'loss': res.fun}
-    ci_fitting = compute_ci_fitting(method, params, distance_matrix, connectivity_matrix, RCM)
+    ci_fitting = compute_ci_fitting(method, params, distance_matrix, connectivity_matrix)
     
     return result, ci_fitting
 
@@ -428,7 +354,7 @@ class FittingConfig:
     """
     
     @staticmethod
-    def get_config(model_type: str, recovery_type: str):
+    def get_config(model_type: str):
         """
         Get the config dictionary based on model type and recovery type.
     
@@ -444,10 +370,10 @@ class FittingConfig:
         """
         model_type = model_type.lower()
     
-        if model_type == 'basic' and recovery_type == 'linear':
-            return FittingConfig.config_basic_model_linear_recovery
-        elif model_type == 'advanced' and recovery_type == 'linear_ratio':
-            return FittingConfig.config_advanced_model_linear_ratio_recovery
+        if model_type == 'basic':
+            return FittingConfig.config_basic
+        elif model_type == 'advanced':
+            return FittingConfig.config_advanced
         else:
             raise ValueError(f"Invalid model_type '{model_type}'")
     
@@ -456,7 +382,19 @@ class FittingConfig:
         """Auto-generate param_func based on param_names."""
         return lambda p: {name: p[i] for i, name in enumerate(param_names)}
 
-    config_basic_model_linear_recovery = {
+    config_basic = {
+        'generalized_surface_laplacian': {
+            'param_names': ['sigma'],
+            'bounds': [(0.001, 5.0)],
+        },
+        
+        'graph_laplacian_filtering': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.001, 5.0), (-5.0, 5.0)], 
+        },
+    }
+
+    config_advanced = {
         'generalized_surface_laplacian': {
             'param_names': ['sigma', 'deviation', 'offset'],
             'bounds': [(0.001, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
@@ -468,19 +406,7 @@ class FittingConfig:
         },
     }
 
-    config_advanced_model_linear_ratio_recovery = {
-        'generalized_surface_laplacian': {
-            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.001, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        
-        'graph_laplacian_filtering': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.001, 5.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-    }
-
-def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, distance_matrix=None, connectivity_matrix=None):
+def fitting_model(model_type='basic', ci_target=None, distance_matrix=None, connectivity_matrix=None):
     """
     Perform model fitting across multiple methods.
 
@@ -499,7 +425,7 @@ def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, di
     results, cis_fitting = {}, {}
 
     # Load fitting configuration
-    fitting_config = FittingConfig.get_config(model_type, recovery_type)
+    fitting_config = FittingConfig.get_config(model_type)
 
     for method, config in fitting_config.items():
         print(f"Fitting Method: {method}")
@@ -520,7 +446,6 @@ def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, di
                 param_names,
                 distance_matrix,
                 connectivity_matrix,
-                RCM=recovery_type
             )
         except Exception as e:
             print(f"[{method.upper()}] Optimization failed: {e}")
@@ -537,8 +462,7 @@ def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, di
 
 from collections import OrderedDict
 import os
-def fitting_model_best(model_type='basic', recovery_type='differ',
-                       ci_target=None, distance_matrix=None, connectivity_matrix=None, N_TRIALS=5):
+def fitting_model_best(model_type='basic', ci_target=None, distance_matrix=None, connectivity_matrix=None, N_TRIALS=5):
     """
     上位函数：循环运行 fitting_model，并输出试次内最佳优化结果（最低loss）。
     同时保留所有试次的完整结果。
@@ -564,7 +488,6 @@ def fitting_model_best(model_type='basic', recovery_type='differ',
         print(f"\n==== Trial {t+1}/{N_TRIALS} ====")
         res_t, cis_t = fitting_model(
             model_type=model_type,
-            recovery_type=recovery_type,
             ci_target=ci_target,
             distance_matrix=distance_matrix,
             connectivity_matrix=connectivity_matrix
@@ -1301,12 +1224,11 @@ if __name__ == '__main__':
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
     # %% Fitting
-    fm_model, rcm_model = 'basic', 'linear' # 'basic', 'advanced'; 'linear', 'linear_ratio'
+    fm_model = 'basic'
     # fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'linear', 'linear_ratio'
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
-    results_best, cis_best, results_all, cis_all = fitting_model_best(fm_model, rcm_model, 
-                                                                      ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
+    results_best, cis_best, results_all, cis_all = fitting_model_best(fm_model, ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
     
     # %% Insert reference (LDMI) and initial ci (CM)
     ci_initial_model = np.mean(cm_global_averaged, axis=0)
@@ -1323,8 +1245,8 @@ if __name__ == '__main__':
     # %% Save
     path_currebt = os.getcwd()
     results_path = os.path.join(os.getcwd(), 'fitted_results')
-    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_{rcm_model}).xlsx')
-    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_{rcm_model}).xlsx')
+    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}).xlsx')
+    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}).xlsx')
     
     # %% Validation of Fitted Comparison
     # joint scatter

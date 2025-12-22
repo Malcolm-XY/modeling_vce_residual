@@ -47,7 +47,7 @@ def cm_rebuilding_competing(cms, distance_matrix, params, method='generalized_su
     return cms_rebuilt
 
 def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connectivity_matrix,
-                                                     method='generalized_surface_laplacian', params=None, kernel_normalization=True):
+                                                     method='generalized_surface_laplacian', params=None):
     """
     基于距离矩阵计算体积电导效应的因子矩阵，支持多种模型和通用偏移参数:
     exponential, gaussian, inverse, cutoff, powerlaw, rational_quadratic, generalized_gaussian, sigmoid
@@ -68,8 +68,8 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connecti
 
     # 默认参数集合，增加 deviation 和 offset
     default_params = {
-        'generalized_surface_laplacian': {'sigma': 10.0, 'deviation': 0.0, 'offset': 0.0},
-        'graph_laplacian_filtering': {'alpha': 1.0, 'deviation': 0.0, 'offset': 0.0},
+        'generalized_surface_laplacian': {'sigma': 0.1, 'deviation': 0.0, 'offset': 0.0},
+        'graph_laplacian_filtering': {'sigma': 0.1, 'alpha': 1.0, 'deviation': 0.0, 'offset': 0.0},
     }
     
     method = method.lower()
@@ -90,12 +90,10 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connecti
     factor_matrix = np.zeros_like(_distance_matrix)
 
     if method == 'generalized_surface_laplacian':
-        cm_recovered = apply_generalized_surface_laplacian_filtering(_connectivity_matrix, _distance_matrix,
-                                                                     filtering_params=params, kernel_normalization=kernel_normalization)
+        cm_recovered = apply_generalized_surface_laplacian_filtering(_connectivity_matrix, _distance_matrix, filtering_params=params)
 
     elif method == 'graph_laplacian_filtering':
-        cm_recovered =  apply_graph_laplacian_filtering(_connectivity_matrix, _distance_matrix,
-                                                        filtering_params=params, kernel_normalization=kernel_normalization)
+        cm_recovered =  apply_graph_laplacian_filtering(_connectivity_matrix, _distance_matrix, filtering_params=params)
 
     else:
         raise ValueError(f"不支持的体积电导建模方法: {method}")
@@ -104,41 +102,35 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, _connecti
     np.fill_diagonal(factor_matrix, 1.0)
     return cm_recovered
 
-def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, 
-                                                  filtering_params, kernel_normalization):
-    """
-    向量化的 FN-Laplacian（边空间）实现：
-    M' = M - neighbor_avg
-    neighbor_avg(i,j) = [sum_v W[j,v] M[i,v] + sum_u W[i,u] M[u,j]] / [sum_v W[j,v] + sum_u W[i,u] - 2W[i,j]]
+def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix, filtering_params, settings={}):
+    # copy inputs
+    matrix = np.array(matrix, dtype=float, copy=True)
+    distance_matrix = np.array(distance_matrix, dtype=float, copy=True)
+    distance_matrix = np.where(distance_matrix == 0, 1e-6, distance_matrix)
     
-    若 normalized=False，则分母省略，直接用加权和（更贴近未归一化拉普拉斯）。
-    支持 knn 稀疏化以加速大规模 N。
-    """
-
+    # parameters
+    # print('SLF Parameters: ', filtering_params)
+    
     sigma = float(filtering_params.get('sigma', 0.1))
-    deviation = filtering_params.get('deviation', 0.0)
-    offset = filtering_params.get('offset', 0.0)
-    knn = None # knn = filtering_params.get('knn', None)
+    deviation = float(filtering_params.get('deviation', 0.0))
+    offset = float(filtering_params.get('offset', 0.0))
     
-    M = np.array(matrix, dtype=float, copy=True)
-    D = np.array(distance_matrix, dtype=float, copy=True) + deviation
-    N = M.shape[0]
-
-    # 1) 保证对称/对角清零（FC 一般对称且对角应为 0）
-    M = 0.5 * (M + M.T)
-    np.fill_diagonal(M, 0.0)
-
-    # 2) 构造权重核 W = exp(-(D^2)/(2*sigma^2))，对角置 0
-    if sigma <= 0:
-        raise ValueError("sigma must be > 0.")
-    W = np.exp(-np.square(D) / (2 * sigma ** 2))
-    np.fill_diagonal(W, 0.0)
+    # constant settings
+    knn = settings.get('knn', None)
+    kernel_normalization = str(settings.get('kernel_normalization', True))
     
-    # normalization
+    # apply deviation
+    distance_matrix = distance_matrix + deviation
+
+    # step 1: construct adjacency matrix W (Gaussian kernel)
+    W = np.exp(-np.square(distance_matrix) / (2 * sigma ** 2))
+    np.fill_diagonal(W, 0)
+
     if kernel_normalization:
         W = W / (W.sum(axis=1, keepdims=True) + 1e-12)
     
     # 3) 可选 kNN 稀疏化（每行只保留 k 个最大权重）
+    N = matrix.shape[0]
     if knn is not None and isinstance(knn, int) and knn > 0 and knn < N-1:
         # 对每一行，保留最大的 knn 个非对角元素
         # 用 partition 实现 O(N) 选择，再零掉其余
@@ -151,63 +143,56 @@ def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix,
         W = np.where(mask, W, 0.0)
 
     # 5) 两次矩阵乘法（BLAS 加速）：A = M W,  B = W M
-    A = M @ W
-    B = W @ M
-
-    # 未归一化：使用加权和（对应你最初公式的“求和”版本）
-    neighbor_avg = A + B
+    A = matrix @ W
+    B = W @ matrix
 
     # 6) 滤波：M' = M - neighbor_avg
-    M_filtered = M - neighbor_avg + offset
+    neighbor_avg = A + B
+    filtered_matrix = matrix - neighbor_avg
+    
+    # apply offset
+    filtered_matrix = filtered_matrix + offset
+    
+    return filtered_matrix
 
-    # 8) 对称化
-    M_filtered = 0.5 * (M_filtered + M_filtered.T)
-
-    return M_filtered
-
-def apply_graph_laplacian_filtering(matrix, distance_matrix,
-                                    filtering_params, kernel_normalization):
+def apply_graph_laplacian_filtering(matrix, distance_matrix, filtering_params, settings={}):
+    # copy inputs
     matrix = np.array(matrix, dtype=float, copy=True)
     distance_matrix = np.array(distance_matrix, dtype=float, copy=True)
-
-    sigma, k = filtering_params.get('sigma', 0.1), filtering_params.get('k', 3)
-    alpha = float(filtering_params.get('alpha', 1))
-    if isinstance(sigma, (int, float)):
-        pass  # use directly
-    elif sigma == "mean_nonzero" or sigma is None:
-        sigma = np.mean(distance_matrix[distance_matrix > 0])
-    elif sigma == "knn_median":
-        N = distance_matrix.shape[0]
-        knn_means = []
-        for i in range(N):
-            dists = np.sort(distance_matrix[i][distance_matrix[i] > 0])
-            if len(dists) >= k:
-                knn_means.append(np.mean(dists[:k]))
-        sigma = np.median(knn_means)
-    else:
-        raise ValueError(f"Unknown sigma mode: {sigma}")
-    laplacian_normalization = bool(filtering_params.get('laplacian_normalization', False))
-    mode = str(filtering_params.get('mode', 'highpass')) # "lowpass" or "highpass"
-    lateral_mode = str(filtering_params.get('lateral_mode', 'unilateral')) # 'unilateral' or 'bilateral'
-    
-    # Avoid division by zero
     distance_matrix = np.where(distance_matrix == 0, 1e-6, distance_matrix)
-
-    # Step 2: Construct adjacency matrix W (Gaussian kernel)
+    
+    # parameters
+    # print('GLF Parameters: ', filtering_params)
+    
+    sigma = float(filtering_params.get('sigma', 0.1))
+    alpha = float(filtering_params.get('alpha', 1))
+    deviation = float(filtering_params.get('deviation', 0.0))
+    offset = float(filtering_params.get('offset', 0.0))
+    
+    # constant settings
+    kernel_normalization = str(settings.get('kernel_normalization', True))
+    laplacian_normalization = bool(settings.get('laplacian_normalization', True))
+    mode = str(settings.get('mode', 'highpass')) 
+    lateral_mode = str(settings.get('lateral_mode', 'unilateral'))
+    
+    # apply deviation
+    distance_matrix = distance_matrix + deviation
+    
+    # step 1: construct adjacency matrix W (Gaussian kernel)
     W = np.exp(-np.square(distance_matrix) / (2 * sigma ** 2))
     np.fill_diagonal(W, 0)
-
+    
     if kernel_normalization:
         W = W / (W.sum(axis=1, keepdims=True) + 1e-12)
     
-    # Step 3: Compute Laplacian matrix L
+    # step 2: compute Laplacian matrix L
     D = np.diag(W.sum(axis=1))
     if laplacian_normalization:
         d_inv_sqrt = np.diag(1.0 / np.sqrt(np.diag(D)))
         L = np.eye(W.shape[0]) - d_inv_sqrt @ W @ d_inv_sqrt
     else:
         L = D - W
-
+    
     # Step 4: Construct filter matrix
     I = np.eye(W.shape[0])
     if mode == 'lowpass':
@@ -216,7 +201,7 @@ def apply_graph_laplacian_filtering(matrix, distance_matrix,
         F = alpha * L
     else:
         raise ValueError(f"Unknown mode: {mode}")
-
+    
     # Step 5: Apply filtering
     if lateral_mode == 'bilateral':
         filtered_matrix = F @ matrix @ F.T
@@ -224,7 +209,9 @@ def apply_graph_laplacian_filtering(matrix, distance_matrix,
         filtered_matrix = F @ matrix
     else:
         raise ValueError(f"Unknown lateral_mode: {lateral_mode}")
-
+    
+    filtered_matrix = filtered_matrix + offset
+    
     return filtered_matrix
 
 # %% Normalize and prune CI
@@ -1224,7 +1211,7 @@ if __name__ == '__main__':
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
     # %% Fitting
-    fm_model = 'basic'
+    fm_model = 'advanced'
     # fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'linear', 'linear_ratio'
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     

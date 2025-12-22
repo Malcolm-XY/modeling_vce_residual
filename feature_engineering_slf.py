@@ -4,15 +4,36 @@ Created on Wed Dec 17 13:32:51 2025
 
 @author: 18307
 """
-import os
-import h5py
 import numpy as np
+import pandas as pd
 
 import mne
 import time
 
-from utils import utils_feature_loading, utils_eeg_loading
-def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_slf='slf', slf_kwargs=None):
+# %% Filtering Raw EEG
+from utils import utils_eeg_loading
+def filter_eeg_and_save_circle(dataset, subject_range, experiment_range=None,
+                               verbose=True, save=False, apply_filter='surface_laplacian_filtering', kwargs=None):
+    # Normalize parameters
+    apply_filter = apply_filter.lower()
+    dataset = dataset.upper()
+
+    valid_dataset = ['SEED', 'DREAMER']
+    if dataset not in valid_dataset:
+        raise ValueError(f"{dataset} is not a valid dataset. Valid datasets are: {valid_dataset}")
+
+    if dataset == 'SEED' and subject_range is not None and experiment_range is not None:
+        for subject in subject_range:
+            for experiment in experiment_range:
+                identifier = f'sub{subject}ex{experiment}'
+                print(f"Processing: {identifier}.")
+                filtered_eeg = filter_eeg_seed(identifier, save=save, verbose=verbose, apply_filter=apply_filter, kwargs=kwargs)
+    else:
+        raise ValueError("Error of unexpected subject or experiment range designation.")
+    
+    return filtered_eeg
+    
+def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_filter='Surface_Laplacian_Filtering', kwargs=None):
     """
     Load, filter, and optionally save SEED dataset EEG data into frequency bands.
 
@@ -33,11 +54,15 @@ def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_slf='s
     eeg = utils_eeg_loading.read_and_parse_seed(identifier)
     
     # Construct the output folder path for filtered data
-    base_path = os.path.abspath(os.path.join(os.getcwd(), "../../Research_Data/SEED/original eeg/Filtered_SLFed_EEG"))
+    apply_filter = apply_filter.lower()
+    if apply_filter == 'surface_laplacian_filtering':
+        base_path = os.path.abspath(os.path.join(os.getcwd(), "../../Research_Data/SEED/original eeg/Filtered_SLFed_EEG"))
+    elif apply_filter == 'spatio_spectral_decomposition':
+        base_path = os.path.abspath(os.path.join(os.getcwd(), "../../Research_Data/SEED/original eeg/Filtered_SSDed_EEG"))
     os.makedirs(base_path, exist_ok=True)
     
     # Filter the EEG data into different frequency bands
-    filtered_eeg_dict = filter_eeg(eeg, freq=freq, verbose=verbose, apply_slf=apply_slf, slf_kwargs=slf_kwargs)
+    filtered_eeg_dict = filter_eeg(eeg, freq=freq, verbose=verbose, apply_filter=apply_filter, kwargs=kwargs)
     
     # Save filtered EEG data if requested
     if save:
@@ -49,53 +74,112 @@ def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_slf='s
     
     return filtered_eeg_dict
 
-def filter_eeg(eeg, freq=128, verbose=False, apply_slf=False, slf_kwargs=None):
+def filter_eeg(eeg, freq=128, verbose=False, apply_filter='surface_laplacian_filtering', kwargs=None):
     """
-    先（可选）做 SLF，再用 MNE 分段滤波到 Delta/Theta/Alpha/Beta/Gamma。
+    先（可选）做 SLF / SSD（二选一），再用 MNE 分段滤波到 Delta/Theta/Alpha/Beta/Gamma。
+
+    Parameters
+    ----------
+    eeg : np.ndarray
+        (n_channels, n_samples)
+    freq : float
+        Sampling rate (Hz)
+    apply_filter : str
+        'slf' | 'ssd' | None/'none'
+    kwargs : dict | None
+        - if 'slf': kwargs -> surface_laplacian_filtering(...)
+        - if 'ssd': kwargs -> ssd_filtering(...), but f_sig will be overridden per band
+
+    Returns
+    -------
+    dict[str, mne.io.Raw]
+        band name -> MNE Raw object (bandpassed)
     """
+    apply_filter = apply_filter.lower()
     eeg = np.asarray(eeg, dtype=float)
     if eeg.ndim != 2:
         raise ValueError(f"eeg must be (n_channels, n_samples), got {eeg.shape}")
 
-    if apply_slf == 'slf':
-        slf_kwargs = slf_kwargs or {}
-        eeg = surface_laplacian_filtering(
-            eeg_data=eeg,
-            sampling_rate=freq,   # SLF里不使用，但保留接口
-            **slf_kwargs
-        )
-        if verbose:
-            print("Applied SLF on broadband EEG (before bandpass).")
-    elif apply_slf == 'ssd':        
-        print('Test')
-
-    info = mne.create_info(
-        ch_names=[f"Ch{i}" for i in range(eeg.shape[0])],
-        sfreq=freq,
-        ch_types='eeg'
-    )
-    mne_eeg = mne.io.RawArray(eeg, info, verbose="ERROR")
+    kwargs = kwargs or {}
 
     freq_bands = {
         "Delta": (0.5, 4),
         "Theta": (4, 8),
         "Alpha": (8, 13),
-        "Beta": (13, 30),
+        "Beta":  (13, 30),
         "Gamma": (30, 50),
     }
 
-    band_filtered_eeg = {}
-    for band, (low_freq, high_freq) in freq_bands.items():
-        filtered_raw = mne_eeg.copy().filter(
-            l_freq=low_freq, h_freq=high_freq,
+    def _make_raw(X):
+        info = mne.create_info(
+            ch_names=[f"Ch{i}" for i in range(X.shape[0])],
+            sfreq=freq,
+            ch_types='eeg'
+        )
+        return mne.io.RawArray(X, info, verbose="ERROR")
+
+    def _mne_bandpass(raw, low, high):
+        return raw.copy().filter(
+            l_freq=low, h_freq=high,
             method="fir", phase="zero-double",
             verbose="ERROR"
         )
-        band_filtered_eeg[band] = filtered_raw
-        if verbose:
-            print(f"{band} band filtered: {low_freq}–{high_freq} Hz")
 
-    return band_filtered_eeg
+    apply_filter = (apply_filter or "none").lower()
+    band_filtered_eeg = {}
+
+    # ---------- Case 1: SLF on broadband, then bandpass ----------
+    if apply_filter == "surface_laplacian_filtering":
+        eeg_slf = surface_laplacian_filtering(
+            eeg_data=eeg,
+            sampling_rate=freq,  # 你说 SLF 内部不使用，但保留接口
+            **kwargs
+        )
+        if verbose:
+            print("Applied SLF on broadband EEG (before bandpass).")
+
+        raw = _make_raw(eeg_slf)
+        for band, (low, high) in freq_bands.items():
+            band_filtered_eeg[band] = _mne_bandpass(raw, low, high)
+            if verbose:
+                print(f"{band} band filtered: {low}–{high} Hz")
+
+        return band_filtered_eeg
+
+    # ---------- Case 2: SSD per-band, then bandpass ----------
+    if apply_filter == "spatio_spectral_decomposition":
+        # 复制一份 kwargs，避免污染外部
+        ssd_kwargs = dict(kwargs)
+        # f_sig 由每个 band 决定，这里强制移除用户传入的 f_sig，避免冲突/歧义
+        ssd_kwargs.pop("f_sig", None)
+
+        for band, (low, high) in freq_bands.items():
+            eeg_ssd, *_ = ssd_filtering(
+                eeg_data=eeg,
+                sampling_rate=freq,
+                f_sig=(low, high),
+                **ssd_kwargs
+            )
+            if verbose:
+                print(f"Applied SSD for {band} target band: {low}–{high} Hz")
+
+            raw = _make_raw(eeg_ssd)
+            band_filtered_eeg[band] = _mne_bandpass(raw, low, high)
+            if verbose:
+                print(f"{band} band filtered (post-SSD): {low}–{high} Hz")
+
+        return band_filtered_eeg
+
+    # ---------- Case 3: no spatial filter, only bandpass ----------
+    if apply_filter in ("none", "no", "false", "0"):
+        raw = _make_raw(eeg)
+        for band, (low, high) in freq_bands.items():
+            band_filtered_eeg[band] = _mne_bandpass(raw, low, high)
+            if verbose:
+                print(f"{band} band filtered: {low}–{high} Hz")
+        return band_filtered_eeg
+
+    raise ValueError("apply_filter must be one of: 'slf', 'ssd', None/'none'")
 
 def surface_laplacian_filtering(eeg_data, sampling_rate, dist=None, m=4, _lambda=1e-4):
     """
@@ -210,13 +294,6 @@ def surface_laplacian_filtering(eeg_data, sampling_rate, dist=None, m=4, _lambda
 
     return eeg_data_filtered
 
-dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
-filtered_eeg_dict = filter_eeg_seed('sub1ex1', freq=200, save=True, verbose=True,
-                                    apply_slf='slf', slf_kwargs={"dist": dist, "m": 4, "_lambda": 1e-4})
-
-
-
-
 from scipy import signal
 def ssd_filtering(eeg_data, sampling_rate, 
                   f_sig=(8.0, 12.0), gap=1.0, bw_noise=2.0, n_components=6, filt_order=4, cov_reg=1e-3,):
@@ -255,17 +332,23 @@ def ssd_filtering(eeg_data, sampling_rate,
     meta : dict
         bands, etc.
     """
-    def _bandpass_filtfilt(X, fs, band, order=4, ftype="butter"):
-        """Zero-phase bandpass filtering for (channels, time)."""
+    def _sanitize_band(band, fs, fmin=0.1, margin=1e-6):
+        """Clip band into (0, fs/2) and ensure low < high."""
         low, high = band
-        if low <= 0 or high >= fs / 2:
-            raise ValueError(f"Invalid band {band} for fs={fs}")
-        if ftype == "butter":
-            b, a = signal.butter(order, [low, high], btype="bandpass", fs=fs)
-            return signal.filtfilt(b, a, X, axis=1)
-        else:
-            raise NotImplementedError("Only butter is implemented in this template.")
+        nyq = fs / 2.0
+        low = max(fmin, float(low))
+        high = min(nyq - fmin, float(high))  # 留一点余量避免贴边
+        if not (low + margin < high):
+            return None
+        return (low, high)
 
+    def _bandpass_filtfilt(X, fs, band, order=4):
+        band = _sanitize_band(band, fs)
+        if band is None:
+            return None
+        low, high = band
+        b, a = signal.butter(order, [low, high], btype="bandpass", fs=fs)
+        return signal.filtfilt(b, a, X, axis=1)
 
     def _covariance(X, reg=0.0):
         """
@@ -309,13 +392,31 @@ def ssd_filtering(eeg_data, sampling_rate,
     noise_left = (max(0.1, f1 - gap - bw_noise), max(0.1, f1 - gap))
     noise_right = (f2 + gap, f2 + gap + bw_noise)
 
-    # Filter to build covariances
-    Xs = _bandpass_filtfilt(X, sampling_rate, f_sig, order=filt_order)
-    Xn1 = _bandpass_filtfilt(X, sampling_rate, noise_left, order=filt_order)
-    Xn2 = _bandpass_filtfilt(X, sampling_rate, noise_right, order=filt_order)
-
+    noise_left_raw  = (f1 - gap - bw_noise, f1 - gap)
+    noise_right_raw = (f2 + gap, f2 + gap + bw_noise)
+    
+    Xs  = _bandpass_filtfilt(X, sampling_rate, f_sig, order=filt_order)
+    Xn1 = _bandpass_filtfilt(X, sampling_rate, noise_left_raw, order=filt_order)
+    Xn2 = _bandpass_filtfilt(X, sampling_rate, noise_right_raw, order=filt_order)
+    
+    if Xs is None:
+        raise ValueError(f"Signal band {f_sig} invalid for fs={sampling_rate}")
+    
     Cs = _covariance(Xs, reg=cov_reg)
-    Cn = 0.5 * (_covariance(Xn1, reg=cov_reg) + _covariance(Xn2, reg=cov_reg))
+    
+    # 允许单侧噪声
+    noise_covs = []
+    if Xn1 is not None:
+        noise_covs.append(_covariance(Xn1, reg=cov_reg))
+    if Xn2 is not None:
+        noise_covs.append(_covariance(Xn2, reg=cov_reg))
+    
+    if len(noise_covs) == 0:
+        raise ValueError(
+            f"Both noise flanks invalid for f_sig={f_sig} with gap={gap}, bw_noise={bw_noise}, fs={sampling_rate}"
+        )
+    
+    Cn = sum(noise_covs) / len(noise_covs)
 
     evals, W_full = _ged(Cs, Cn)
 
@@ -342,14 +443,130 @@ def ssd_filtering(eeg_data, sampling_rate,
     
     return eeg_data_filtered, S, W, A, evals, meta
 
-# %% save
+# %% Functional Networks
 import os
 import h5py
-def save_results(dataset, feature, identifier, data, extension='slf'):
+from utils import utils_basic_reading
+def read_eeg_filtered(dataset, identifier, freq_band='joint', object_type='pandas_dataframe', folder_name='Filtered_SLFed_EEG'):
+    """
+    Read filtered EEG data for the specified experiment and frequency band.
+
+    Parameters:
+    dataset (str): Dataset name (e.g., 'SEED', 'DREAMER').
+    identifier (str): Identifier for the subject/session.
+    freq_band (str): Frequency band to load ("alpha", "beta", "gamma", "delta", "theta", or "joint").
+                     Default is "joint", which loads all bands.
+    object_type (str): Desired output format: 'pandas_dataframe', 'numpy_array', or 'mne'.
+
+    Returns:
+    mne.io.Raw | dict | pandas.DataFrame | numpy.ndarray:
+        - If 'mne', returns the MNE Raw object (or a dictionary of them for 'joint').
+        - If 'pandas_dataframe', returns a DataFrame with EEG data.
+        - If 'numpy_array', returns a NumPy array with EEG data.
+
+    Raises:
+    ValueError: If the specified frequency band is not valid.
+    FileNotFoundError: If the expected file does not exist.
+    """
+    # Valid options
+    valid_datasets = ['SEED', 'DREAMER']
+    valid_bands = ['alpha', 'beta', 'gamma', 'delta', 'theta', 'joint']
+    valid_object_types = ['pandas_dataframe', 'numpy_array', 'mne', 'fif']
+    
+    # Normalize inputs
+    dataset = dataset.upper()
+    identifier = identifier.lower()
+    freq_band = freq_band.lower()
+    object_type = object_type.lower()
+    
+    # Validate inputs
+    if dataset not in valid_datasets:
+        raise ValueError(f"Invalid dataset: {dataset}. Choose from {', '.join(valid_datasets)}.")
+    
+    if freq_band not in valid_bands:
+        raise ValueError(f"Invalid frequency band: {freq_band}. Choose from {', '.join(valid_bands)}.")
+    
+    if object_type not in valid_object_types:
+        raise ValueError(f"Invalid object type: {object_type}. Choose from {', '.join(valid_object_types)}.")
+    
+    # Construct base path
+    path_parent_parent = os.path.dirname(os.path.dirname(os.getcwd()))
+    base_path = os.path.join(path_parent_parent, 'Research_Data', dataset, 'original eeg', folder_name)
+    
+    # Function to process a single frequency band
+    def process_band(band):
+        file_path = os.path.join(base_path, f'{identifier}_{band.capitalize()}_eeg.fif')
+        try:
+            raw_data = mne.io.read_raw_fif(file_path, preload=True)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {file_path}. Check the path and file existence.")
+            
+        if object_type == 'pandas_dataframe':
+            return pd.DataFrame(raw_data.get_data(), index=raw_data.ch_names)
+        elif object_type == 'numpy_array':
+            return raw_data.get_data()
+        else:  # Default to MNE Raw object / .fif object
+            return raw_data
+    
+    # Handle joint vs. single band request
+    if freq_band == 'joint':
+        result = {}
+        for band in ['alpha', 'beta', 'gamma', 'delta', 'theta']:
+            result[band] = process_band(band)
+        return result
+    else:
+        return process_band(freq_band)
+
+def read_fcs(dataset, identifier, feature, band='joint', file_type='.h5', folder_name='functional connectivity_slf'):
+    """
+    Reads functional connectivity (FCS) data from a file (HDF5 or MAT format).
+
+    Parameters:
+    - dataset (str): Dataset name (e.g., 'SEED').
+    - identifier (str): Subject or experiment identifier.
+    - feature (str): Feature type (e.g., 'pcc', 'pli').
+    - band (str): Frequency band to extract (default: 'joint').
+    - file_type (str): File extension indicating format, either '.h5' or '.mat'.
+
+    Returns:
+    - dict: FCS data for the specified band. If the band is not found, returns an empty dict.
+    
+    Raises:
+    - ValueError: If the specified file_type is unsupported.
+    - FileNotFoundError: If the corresponding file does not exist.
+    """
+    dataset = dataset.upper()
+    identifier = identifier.lower()
+    feature = feature.lower()
+    band = band.lower()
+
+    base_path = os.path.abspath(os.path.join(os.getcwd(), "../.."))
+    base_dir = os.path.join(base_path, 'Research_Data', dataset, folder_name)
+
+    if file_type == '.h5':
+        path_file = os.path.join(base_dir, f'{feature}_h5', f"{identifier}.h5")
+        fcs_data = utils_basic_reading.read_hdf5(path_file)
+    elif file_type == '.mat':
+        path_file = os.path.join(base_dir, f'{feature}_mat', f"{identifier}.mat")
+        fcs_data = utils_basic_reading.read_mat(path_file)
+    else:
+        raise ValueError(f"Unsupported file_type: {file_type}. Supported types are '.h5' and '.mat'.")
+
+    return fcs_data if band == 'joint' else fcs_data.get(band, {})
+
+def read_fcs_global_average(dataset, feature, band='joint', sub_range=range(1, 16), folder_name='functional connectivity_slf'):
+    dataset, feature, band = dataset.upper(), feature.lower(), band.lower()
+    path_parent_parent = os.path.dirname(os.path.dirname(os.getcwd()))
+    path_file = os.path.join(path_parent_parent, 'Research_Data', dataset, folder_name, 
+                             f'{feature}_h5', f'global_averaged_{sub_range.stop-1}_15.h5')
+    fcs_temp = utils_basic_reading.read_hdf5(path_file)
+    return fcs_temp if band == 'joint' else fcs_temp.get(band, {})
+
+def save_results(dataset, feature, identifier, data, folder_name='functional connectivity_slf'):
     """Saves functional connectivity matrices to an HDF5 file."""
     path_parent = os.path.dirname(os.getcwd())
     path_parent_parent = os.path.dirname(path_parent)
-    base_path = os.path.join(path_parent_parent, 'Research_Data', dataset, f'functional connectivity_{extension}', f'{feature}_h5')
+    base_path = os.path.join(path_parent_parent, 'Research_Data', dataset, folder_name, f'{feature}_h5')
     os.makedirs(base_path, exist_ok=True)
     
     file_path = os.path.join(base_path, f"{identifier}.h5")
@@ -362,10 +579,9 @@ def save_results(dataset, feature, identifier, data, extension='slf'):
 
     print(f"Data saved to {file_path}")
 
-# %%
-from feature_engineering import compute_corr_matrices
-def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experiment_range=range(1, 2),
-                 feature='pcc', band='joint', method='slf', save=False, verbose=True):
+from feature_engineering import compute_corr_matrices, compute_plv_matrices
+def fc_matrices_circle_vc_filtered(dataset, subject_range=range(1, 2), experiment_range=range(1, 2),
+                                   feature='pcc', band='joint', method='surface_laplacian_filtering', save=False, verbose=True):
     """
     Computes functional connectivity matrices for EEG datasets.
 
@@ -394,17 +610,28 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
     valid_datasets = {'SEED', 'DREAMER'}
     valid_features = {'pcc', 'plv', 'mi', 'pli', 'wpli'}
     valid_bands = {'joint', 'theta', 'delta', 'alpha', 'beta', 'gamma'}
-    valid_methods ={'slf', 'ssd', 'ged', }
-
+    valid_methods = {'surface_laplacian_filtering', 'spatio_spectral_decomposition'}
+    
     if dataset not in valid_datasets:
         raise ValueError(f"Invalid dataset '{dataset}'. Supported datasets: {valid_datasets}")
+    if feature not in valid_features:
+        raise ValueError(f"Invalid feature '{feature}'. Supported features: {valid_features}")
     if band not in valid_bands:
         raise ValueError(f"Invalid band '{band}'. Supported bands: {valid_bands}")
+    if method not in valid_methods:
+        raise ValueError(f"Invalid method '{method}'. Supported methods: {valid_methods}")
 
-    def eeg_loader(subject, experiment=None):
+    if method == 'surface_laplacian_filtering':
+        folder_name = 'Filtered_SLFed_EEG'
+        save_folder = 'functional_connectivity_slfed'
+    elif method == 'spatio_spectral_decomposition':
+        folder_name = 'Filtered_SSDed_EEG'
+        save_folder = 'functional_connectivity_ssded'
+
+    def eeg_loader(subject, experiment=None, folder_name='Filtered_SLFed_EEG'):
         """Loads EEG data for a given subject and experiment."""
         identifier = f"sub{subject}ex{experiment}" if dataset == 'SEED' else f"sub{subject}"
-        eeg_data = utils_eeg_loading.read_eeg_filtered(dataset, identifier)
+        eeg_data = read_eeg_filtered(dataset, identifier, folder_name=folder_name)
         return identifier, eeg_data
 
     fc_matrices = {}
@@ -424,22 +651,19 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
             experiment_start = time.time()
             experiment_count += 1
 
-            identifier, eeg_data = eeg_loader(subject, experiment)
+            identifier, eeg_data_filtered = eeg_loader(subject, experiment, folder_name)
             bands_to_process = ['delta', 'theta', 'alpha', 'beta', 'gamma'] if band == 'joint' else [band]
 
             fc_matrices[identifier] = {} if band == 'joint' else None
 
             for current_band in bands_to_process:
-                data = np.array(eeg_data[current_band])
-                
-                if method == 'slf':
-                    eeg_data_filtered = surface_laplacian_filtering(data, sampling_rate, dataset=dataset)
-                elif method == 'ssd':
-                    eeg_data_filtered,_,_,_,_,_ = ssd_filtering(data, sampling_rate)
+                data = np.array(eeg_data_filtered[current_band])
                 
                 if feature == 'pcc':
-                    result = compute_corr_matrices(eeg_data_filtered, sampling_rate)    
-                    
+                    result = compute_corr_matrices(data, sampling_rate)    
+                elif feature == 'plv':
+                    result = compute_plv_matrices(data, sampling_rate)
+                
                 if band == 'joint':
                     fc_matrices[identifier][current_band] = result
                 else:
@@ -452,7 +676,7 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
                 print(f"Experiment {identifier} completed in {experiment_duration:.2f} seconds")
 
             if save:
-                save_results(dataset, feature, identifier, fc_matrices[identifier], extension=method)
+                save_results(dataset, feature, identifier, fc_matrices[identifier], folder_name=save_folder)
 
     total_time = time.time() - start_time
     avg_experiment_time = total_experiment_time / experiment_count if experiment_count else 0
@@ -461,8 +685,142 @@ def fc_matrices_circle_vc_filtering(dataset, subject_range=range(1, 2), experime
         print(f"\nTotal time taken: {total_time:.2f} seconds")
         print(f"Average time per experiment: {avg_experiment_time:.2f} seconds")
 
-    return eeg_data_filtered
+    return None
 
-# dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
-# fc_matrices = fc_matrices_circle_vc_filtering('seed', subject_range=range(1, 16), experiment_range=range(1, 4),
-#                                               method='ged', band='joint', save=True, verbose=True)
+from utils import utils_visualization
+def compute_average_fcs(dataset, subjects=range(1, 2), experiments=range(1, 2), 
+                        feature='pcc', band='joint', filtering_method='surface_laplacian_filtering', # 'spatio_spectral_decomposition'
+                        in_file_type='.h5', 
+                        save=False, verbose=False, visualization=False):
+    """
+    Computes and optionally saves or visualizes the averaged functional connectivity matrices.
+
+    Parameters
+    ----------
+    dataset : str
+        Dataset name (e.g., 'seed').
+    subjects : iterable
+        List or range of subject indices.
+    experiments : iterable
+        List or range of experiment indices.
+    feature : str
+        Feature type, e.g., 'pcc', 'plv', 'pli'.
+    band : str
+        Frequency band or 'joint' for all bands.
+    in_file_type : str
+        Input file type, '.h5' or '.mat'.
+    out_file_type : str
+        Output file type, '.h5' or '.mat'.
+    save : bool
+        Whether to save the result.
+    verbose : bool
+        Whether to print verbose output.
+    visualization : bool
+        Whether to visualize the global averaged matrix.
+
+    Returns
+    -------
+    np.ndarray
+        The global averaged functional connectivity matrix.
+    """
+    assert filtering_method.lower() in {'surface_laplacian_filtering', 'spatio_spectral_decomposition'}, "Unsupported filtering method."
+    assert dataset.lower() in {'seed'}, "Unsupported dataset."
+    assert feature.lower() in {'pcc', 'plv', 'mi', 'pli', 'wpli'}, "Invalid feature."
+    assert band.lower() in {'joint', 'alpha', 'beta', 'gamma', 'delta', 'theta'}, "Invalid band."
+    assert in_file_type in {'.h5', '.mat'}, "Unsupported input file type."
+
+    if filtering_method.lower() == 'surface_laplacian_filtering':
+        read_folder = 'functional_connectivity_SLFed'
+        save_folder = 'functional_connectivity_SLFed'
+    elif filtering_method.lower() == 'spatio_spectral_decomposition':
+        read_folder = 'functional_connectivity_SSDed'
+        save_folder = 'functional_connectivity_SSDed'
+    
+    fcs_averaged_dict, fcs_averaged_dict_ = [], {'alpha': [], 'beta': [], 'gamma': [], 'delta': [], 'theta': []}
+    
+    for subject in subjects:
+        for experiment in experiments:
+            identifier = f"sub{subject}ex{experiment}"
+            if verbose:
+                print(f"Processing: {identifier}")
+            
+            features = read_fcs(dataset, identifier, feature, band, in_file_type, folder_name=read_folder)
+            
+            if band == 'joint':
+                try:
+                    avg_bands = [{"average": np.mean(features[b], axis=0), 
+                                  "band": b, "subject": subject, "experiment": experiment} 
+                                 for b in ['alpha', 'beta', 'gamma', 'delta', 'theta']]
+                    
+                    fcs_averaged_dict.append(avg_bands)
+                    for entry in avg_bands:                        
+                        fcs_averaged_dict_[entry["band"]].append(entry["average"])
+                    
+                    # Correct theta/delta swap if necessary
+                except KeyError:
+                    avg_bands = [{"average": np.mean(features[b], axis=0), 
+                                  "band": b, "subject": subject, "experiment": experiment} 
+                                 for b in ['alpha', 'beta', 'gamma']]
+                    
+                    fcs_averaged_dict.append(avg_bands)
+                    for entry in avg_bands:                        
+                        fcs_averaged_dict_[entry["band"]].append(entry["average"])
+
+    # Compute global average
+    try:
+        fcs_global_averaged = {b: np.mean(fcs_averaged_dict_[b], axis=0)
+                               for b in ['alpha', 'beta', 'gamma', 'delta', 'theta']}
+    except KeyError:
+        fcs_global_averaged = {b: np.mean(fcs_averaged_dict_[b], axis=0)
+                               for b in ['alpha', 'beta', 'gamma']}
+        
+    if visualization:
+        for fc in fcs_global_averaged.values():
+            utils_visualization.draw_projection(fc)
+
+    if save:
+        save_results(dataset, feature, f'global_averaged_{subject}_15', fcs_global_averaged, folder_name=save_folder)
+        
+        if verbose:
+            print("Results saved to .h5 and .mat")
+
+    return fcs_global_averaged, fcs_averaged_dict_
+
+# %%
+if __name__ == '__main__':
+    # %% Surface Laplacian Filtering
+    # slf eeg
+    # from utils import utils_feature_loading
+    # dist = utils_feature_loading.read_distribution('seed', 'auto', header=True)
+    # filter_eeg_and_save_circle('seed', subject_range=range(1,2), experiment_range=range(1,2), 
+    #                            verbose=True, save=False, apply_filter='surface_laplacian_filtering',
+    #                            kwargs={"dist": dist, "m": 4, "_lambda": 1e-4})
+    
+    # slf fns
+    # fc_matrices_circle_vc_filtered('seed', subject_range=range(11, 16), experiment_range=range(1, 4),
+    #                                 feature='plv', band='joint', method='surface_laplacian_filtering', save=True, verbose=True)
+    
+    # averaged fn
+    # compute_average_fcs('seed', range(1, 6), range(1, 4), 
+    #                     feature='plv', band='joint', filtering_method='surface_laplacian_filtering',
+    #                     in_file_type='.h5', 
+    #                     save=False, verbose=True, visualization=True)
+    
+    # %% Spatio Spectral Decomposition
+    # ssd eeg
+    # filter_eeg_and_save_circle('seed', subject_range=range(1,16), experiment_range=range(1,4), 
+    #                            verbose=True, save=True, apply_filter='spatio_spectral_decomposition')
+    
+    # ssd fns
+    fc_matrices_circle_vc_filtered('seed', subject_range=range(1, 16), experiment_range=range(1, 4),
+                                    feature='plv', band='joint', method='spatio_spectral_decomposition', save=True, verbose=True)
+    
+    # # averaged fn
+    compute_average_fcs('seed', range(1, 2), range(1, 4), 
+                        feature='pcc', band='joint', filtering_method='spatio_spectral_decomposition',
+                        in_file_type='.h5', 
+                        save=False, verbose=True, visualization=True)
+    
+    # %% End Program
+    from cnn_val_circle import end_program_actions
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

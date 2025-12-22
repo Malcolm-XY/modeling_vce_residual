@@ -9,21 +9,241 @@ import numpy as np
 import pandas as pd
 
 import torch
-
 import cnn_validation
 from models import models
-import feature_engineering
-from utils import utils_feature_loading
 
+# %% Competing Methods
+from utils import utils_feature_loading
+def cnn_subnetworks_evaluation_circle_original_cm(selection_rate=1, feature_cm='pcc', 
+                                                 subject_range=range(6,16), experiment_range=range(1,4), 
+                                                 subnetworks_extract='read', subnetworks_exrtact_basis=range(1,6),
+                                                 save=False):
+    if subnetworks_extract == 'read':
+        fcs_global_averaged = utils_feature_loading.read_fcs_global_average('seed', feature_cm, sub_range=subnetworks_exrtact_basis)
+        alpha_global_averaged = fcs_global_averaged['alpha']
+        beta_global_averaged = fcs_global_averaged['beta']
+        gamma_global_averaged = fcs_global_averaged['gamma']
+        
+        strength_alpha = np.sum(np.abs(alpha_global_averaged), axis=1)
+        strength_beta = np.sum(np.abs(beta_global_averaged), axis=1)
+        strength_gamma = np.sum(np.abs(gamma_global_averaged), axis=1)
+        
+        channel_weights = {'alpha': strength_alpha, 
+                           'beta': strength_beta,
+                           'gamma': strength_gamma,
+                           }
+
+    elif subnetworks_extract == 'calculation':
+        functional_node_strength = {'alpha': [], 'beta': [], 'gamma': []}
+        
+        for sub in subnetworks_exrtact_basis:
+            for ex in experiment_range:
+                subject_id = f"sub{sub}ex{ex}"
+                print(f"Evaluating {subject_id}...")
+    
+                # CM/H5
+                features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+                alpha = features['alpha']
+                beta = features['beta']
+                gamma = features['gamma']
+                
+                # Compute node strength
+                strength_alpha = np.sum(np.abs(alpha), axis=1)
+                strength_beta = np.sum(np.abs(beta), axis=1)
+                strength_gamma = np.sum(np.abs(gamma), axis=1)
+                
+                # Save for further analysis
+                functional_node_strength['alpha'].append(strength_alpha)
+                functional_node_strength['beta'].append(strength_beta)
+                functional_node_strength['gamma'].append(strength_gamma)
+    
+        channel_weights = {'gamma': np.mean(np.mean(functional_node_strength['gamma'], axis=0), axis=0),
+                           'beta': np.mean(np.mean(functional_node_strength['beta'], axis=0), axis=0),
+                           'alpha': np.mean(np.mean(functional_node_strength['alpha'], axis=0), axis=0)
+                           }
+    
+    k = {'gamma': int(len(channel_weights['gamma']) * selection_rate),
+         'beta': int(len(channel_weights['beta']) * selection_rate),
+         'alpha': int(len(channel_weights['alpha']) * selection_rate),
+          }
+    
+    channel_selects = {'gamma': np.argsort(channel_weights['gamma'])[-k['gamma']:][::-1],
+                       'beta': np.argsort(channel_weights['beta'])[-k['beta']:][::-1],
+                       'alpha': np.argsort(channel_weights['alpha'])[-k['alpha']:][::-1]
+                       }
+    
+    # for traning and testing in CNN
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed', header=True)
+    y = torch.tensor(np.array(labels)).view(-1)
+   
+    # data and evaluation circle
+    all_results_list = []
+    for sub in subject_range:
+        for ex in experiment_range:
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
+
+            # CM/H5
+            features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+
+            # Selected CM           
+            alpha_selected = alpha[:,channel_selects['alpha'],:][:,:,channel_selects['alpha']]
+            beta_selected = beta[:,channel_selects['beta'],:][:,:,channel_selects['beta']]
+            gamma_selected = gamma[:,channel_selects['gamma'],:][:,:,channel_selects['gamma']]
+            
+            x_selected = np.stack((alpha_selected, beta_selected, gamma_selected), axis=1)
+            
+            # cnn model
+            cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+            # traning and testing
+            result_RCM = cnn_validation.cnn_cross_validation(cnn_model, x_selected, y)
+            
+            # Flatten result and add identifier
+            result_flat = {'Identifier': subject_id, **result_RCM}
+            all_results_list.append(result_flat)
+            
+    # Convert list of dicts to DataFrame
+    df_results = pd.DataFrame(all_results_list)
+    
+    # Compute mean of all numeric columns (excluding Identifier)
+    mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
+    mean_row['Identifier'] = 'Average'
+    
+    # Std
+    std_row = df_results.select_dtypes(include=[np.number]).std(ddof=0).to_dict()
+    std_row['Identifier'] = 'Std'
+    
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row, std_row])], ignore_index=True)
+    
+    # Save
+    if save:        
+        folder_name = 'results_cnn_subnetwork_evaluation'
+        file_name = f'cnn_validation_SubRCM_{feature_cm}_origin.xlsx'
+        sheet_name = f'sr_{selection_rate}'
+        
+        save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
+        
+        # Save Summary (20251220)
+        df_summary = pd.DataFrame([mean_row, std_row])
+        save_to_xlsx_sheet(df_summary, folder_name, file_name, 'summary')
+        
+    return df_results
+
+from feature_engineering_slf import read_fcs as read_fcs_slf
+from feature_engineering_slf import read_fcs_global_average as read_fcs_global_slf
+def cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+                                                            method='Surface_Laplacian_Filtering', 
+                                                            subject_range=range(6,16), experiment_range=range(1,4), 
+                                                            subnetworks_extract='separate_index', selection_rate=1,
+                                                            subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
+                                                            save=False):
+    # subnetwork extraction----start
+    if method.lower() == 'surface_laplacian_filtering':
+        _method = 'slf'
+        folder_name='functional_connectivity_slfed'
+    elif method.lower() == 'spatio_spectral_decomposition':
+        _method = 'ssd'
+        folder_name='functional_connectivity_ssded'
+        
+    if subnetworks_extract == 'unify_index':
+        fcs_global_averaged = utils_feature_loading.read_fcs_global('seed', feature_cm, 'joint', subnets_exrtact_basis_sub)
+        
+    elif subnetworks_extract == 'separate_index':
+        fcs_global_averaged = read_fcs_global_slf('seed', feature_cm, 'joint', subnets_exrtact_basis_sub, folder_name)
+    
+    strength_alpha = np.sum(np.abs(fcs_global_averaged['alpha']), axis=0)
+    strength_beta = np.sum(np.abs(fcs_global_averaged['beta']), axis=0)
+    strength_gamma = np.sum(np.abs(fcs_global_averaged['gamma']), axis=0)
+    
+    channel_importances = {'gamma': strength_gamma, 
+                           'beta': strength_beta, 
+                           'alpha': strength_alpha}
+    
+    k = {'gamma': int(len(channel_importances['gamma']) * selection_rate),
+         'beta': int(len(channel_importances['beta']) * selection_rate),
+         'alpha': int(len(channel_importances['alpha']) * selection_rate)}
+    
+    channel_selects = {'gamma': np.argsort(channel_importances['gamma'])[-k['gamma']:][::-1],
+                       'beta': np.argsort(channel_importances['beta'])[-k['beta']:][::-1],
+                       'alpha': np.argsort(channel_importances['alpha'])[-k['alpha']:][::-1]
+                       }
+    # subnetwork extraction----end
+    
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed', header=True)
+    y = torch.tensor(np.array(labels)).view(-1)
+    
+    # data and evaluation circle
+    all_results_list = []
+    
+    for sub in subject_range:
+        for ex in experiment_range:
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
+            
+            # RCM/H5
+            features = read_fcs_slf('seed', subject_id, feature_cm, folder_name=folder_name)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+            
+            # subnetworks
+            alpha_rebuilded = alpha[:,channel_selects['alpha'],:][:,:,channel_selects['alpha']]
+            beta_rebuilded = beta[:,channel_selects['beta'],:][:,:,channel_selects['beta']]
+            gamma_rebuilded = gamma[:,channel_selects['gamma'],:][:,:,channel_selects['gamma']]
+            
+            x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
+            
+            # cnn model
+            cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+            # traning and testing
+            result_RCM = cnn_validation.cnn_cross_validation(cnn_model, x_rebuilded, y)
+            
+            # Flatten result and add identifier
+            result_flat = {'Identifier': subject_id, **result_RCM}
+            all_results_list.append(result_flat)
+            
+    # Convert list of dicts to DataFrame
+    df_results = pd.DataFrame(all_results_list)
+    
+    # Compute mean of all numeric columns (excluding Identifier)
+    mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
+    mean_row['Identifier'] = 'Average'
+    
+    # Std
+    std_row = df_results.select_dtypes(include=[np.number]).std(ddof=0).to_dict()
+    std_row['Identifier'] = 'Std'
+    
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row, std_row])], ignore_index=True)
+    
+    # Save
+    if save:
+        folder_name = 'results_cnn_subnetwork_evaluation'
+        file_name = f'cnn_validation_SubRCM_{feature_cm}_by_{method}_rcm.xlsx'
+        sheet_name = f'GLF_sr_{selection_rate}'
+        
+        save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
+        
+        # Save Summary (20251220)
+        df_summary = pd.DataFrame([mean_row, std_row])
+        save_to_xlsx_sheet(df_summary, folder_name, file_name, 'summary')
+        
+    return df_results
+
+import feature_engineering
 from vce_model_fitting_competing import cm_rebuilding_competing
-def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "auto", "type": "3d_euclidean"}, 
-                                                feature_cm='pcc', 
-                                                model='Generalized_Surface_Laplacian', model_fm='basic',
-                                                param='fitted_results_competing(sub1_sub5_joint_band)',
-                                                subject_range=range(6,16), experiment_range=range(1,4), 
-                                                subnetworks_extract='separate_index', selection_rate=1,
-                                                subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
-                                                save=False):
+def cnn_subnetworks_evaluation_circle_competing_network_level(projection_params={"source": "auto", "type": "3d_euclidean"}, 
+                                                              feature_cm='pcc', 
+                                                              model='Generalized_Surface_Laplacian', model_fm='basic',
+                                                              param='fitted_results_competing(sub1_sub5_joint_band)',
+                                                              subject_range=range(6,16), experiment_range=range(1,4), 
+                                                              subnetworks_extract='separate_index', selection_rate=1,
+                                                              subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
+                                                              save=False):
     # distance matrix
     _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"}, visualize=True)
     dm = feature_engineering.normalize_matrix(dm)
@@ -133,18 +353,23 @@ def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "au
         sheet_name = f'GLF_sr_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
+        
+        # Save Summary (20251220)
+        df_summary = pd.DataFrame([mean_row, std_row])
+        save_to_xlsx_sheet(df_summary, folder_name, file_name, 'summary')
 
     return df_results
 
+# %% DM-RC; Proposed Method
 from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
-def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "auto", "type": "3d_euclidean"}, 
-                                                 feature_cm='pcc', 
-                                                 model='Exponential', model_fm='basic', model_rcm='linear',
-                                                 param='fitted_results(sub1_sub5_joint_band)', 
-                                                 subject_range=range(6,16), experiment_range=range(1,4), 
-                                                 subnetworks_extract='separate_index', selection_rate=1,
-                                                 subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
-                                                 save=False):
+def cnn_subnetworks_evaluation_circle_DM_RC(projection_params={"source": "auto", "type": "3d_euclidean"}, 
+                                            feature_cm='pcc', 
+                                            model='Exponential', model_fm='basic', model_rcm='linear',
+                                            param='fitted_results(sub1_sub5_joint_band)', 
+                                            subject_range=range(6,16), experiment_range=range(1,4), 
+                                            subnetworks_extract='separate_index', selection_rate=1,
+                                            subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
+                                            save=False):
     # distance matrix
     _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"}, visualize=True)
     dm = feature_engineering.normalize_matrix(dm)
@@ -252,6 +477,10 @@ def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "a
         sheet_name = f'{model}_sr_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
+        
+        # Save Summary (20251220)
+        df_summary = pd.DataFrame([mean_row, std_row])
+        save_to_xlsx_sheet(df_summary, folder_name, file_name, 'summary')
 
     return df_results
 
@@ -262,15 +491,15 @@ def cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='lin
     
     results_fitting = {}
     for trail in range(0, 7):       
-        results_fitting[model[trail]] = cnn_subnetworks_evaluation_circle_rebuilt_cm(
-                                                            projection_params={"source": "auto", "type": "3d_euclidean"}, 
-                                                            feature_cm=feature_cm, 
-                                                            model=model[trail], model_fm=model_fm, model_rcm=model_rcm,
-                                                            param='fitted_results(sub1_sub5_joint_band)', 
-                                                            subject_range=subject_range, experiment_range=range(1,4), 
-                                                            subnetworks_extract=subnetworks_extract, selection_rate=selection_rate,
-                                                            subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
-                                                            save=save)
+        results_fitting[model[trail]] = cnn_subnetworks_evaluation_circle_DM_RC(
+            projection_params={"source": "auto", "type": "3d_euclidean"}, 
+            feature_cm=feature_cm, 
+            model=model[trail], model_fm=model_fm, model_rcm=model_rcm,
+            param='fitted_results(sub1_sub5_joint_band)', 
+            subject_range=subject_range, experiment_range=range(1,4), 
+            subnetworks_extract=subnetworks_extract, selection_rate=selection_rate,
+            subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
+            save=save)
     
     return results_fitting
 
@@ -341,14 +570,36 @@ if __name__ == '__main__':
         #                                             feature_cm='pcc', subject_range=range(6, 16), 
         #                                             subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
         #                                             selection_rate=selection_rate, save=True)
-
+        
         # Competing; GSLF
-        cnn_subnetworks_evaluation_circle_competing(feature_cm='pcc',
-                                                    model='Generalized_Surface_Laplacian', model_fm='basic',
-                                                    param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
-                                                    subject_range=range(6,16),
-                                                    subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-                                                    selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_evaluation_circle_competing(feature_cm='pcc',
+        #                                             model='Generalized_Surface_Laplacian', model_fm='advanced', # 'basic', 'advanced'
+        #                                             param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
+        #                                             subject_range=range(6,16),
+        #                                             subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+        #                                             selection_rate=selection_rate, save=True)
+        
+        # competing; GLF
+        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='pcc',
+        #                                                           model='Graph_Laplacian_filtering', model_fm='basic', # 'basic', 'advanced'
+        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
+        #                                                           subject_range=range(6,16),
+        #                                                           subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+        #                                                           selection_rate=selection_rate, save=True)
+        
+        # competing; SLF
+        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+                                                                 method='Surface_Laplacian_Filtering', 
+                                                                 subject_range=range(6,16), 
+                                                                 subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+                                                                 selection_rate=selection_rate, save=True)
+        
+        # competing; SSD
+        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+                                                                 method='Spatio_Spectral_Decomposition', 
+                                                                 subject_range=range(6,16), 
+                                                                 subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+                                                                 selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions

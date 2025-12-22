@@ -797,8 +797,8 @@ if __name__ == '__main__':
     #                            kwargs={"dist": dist, "m": 4, "_lambda": 1e-4})
     
     # slf fns
-    # fc_matrices_circle_vc_filtered('seed', subject_range=range(11, 16), experiment_range=range(1, 4),
-    #                                 feature='plv', band='joint', method='surface_laplacian_filtering', save=True, verbose=True)
+    # fc_matrices_circle_vc_filtered('seed', subject_range=range(1, 2), experiment_range=range(1, 4),
+    #                                 feature='plv', band='joint', method='surface_laplacian_filtering', save=False, verbose=True)
     
     # averaged fn
     # compute_average_fcs('seed', range(1, 6), range(1, 4), 
@@ -808,19 +808,29 @@ if __name__ == '__main__':
     
     # %% Spatio Spectral Decomposition
     # ssd eeg
-    # filter_eeg_and_save_circle('seed', subject_range=range(1,16), experiment_range=range(1,4), 
-    #                            verbose=True, save=True, apply_filter='spatio_spectral_decomposition')
+    # filter_eeg_and_save_circle('seed', subject_range=range(1,2), experiment_range=range(1,4), 
+    #                            verbose=True, save=False, apply_filter='spatio_spectral_decomposition')
     
     # ssd fns
     fc_matrices_circle_vc_filtered('seed', subject_range=range(1, 16), experiment_range=range(1, 4),
                                     feature='plv', band='joint', method='spatio_spectral_decomposition', save=True, verbose=True)
     
-    # # averaged fn
-    compute_average_fcs('seed', range(1, 2), range(1, 4), 
-                        feature='pcc', band='joint', filtering_method='spatio_spectral_decomposition',
-                        in_file_type='.h5', 
-                        save=False, verbose=True, visualization=True)
+    # averaged fn
+    compute_average_fcs('seed', range(1, 6), range(1, 4), 
+                        feature='plv', band='joint', filtering_method='spatio_spectral_decomposition',
+                        in_file_type='.h5',
+                        save=True, verbose=True, visualization=True)
+    
+    compute_average_fcs('seed', range(1, 11), range(1, 4), 
+                        feature='plv', band='joint', filtering_method='spatio_spectral_decomposition',
+                        in_file_type='.h5',
+                        save=True, verbose=True, visualization=True)
+    
+    compute_average_fcs('seed', range(1, 16), range(1, 4), 
+                        feature='plv', band='joint', filtering_method='spatio_spectral_decomposition',
+                        in_file_type='.h5',
+                        save=True, verbose=True, visualization=True)
     
     # %% End Program
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)

@@ -143,10 +143,10 @@ def cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc',
                                                             save=False):
     # subnetwork extraction----start
     if method.lower() == 'surface_laplacian_filtering':
-        _method = 'slf'
+        # _method = 'slf'
         folder_name='functional_connectivity_slfed'
     elif method.lower() == 'spatio_spectral_decomposition':
-        _method = 'ssd'
+        # _method = 'ssd'
         folder_name='functional_connectivity_ssded'
         
     if subnetworks_extract == 'unify_index':
@@ -572,35 +572,37 @@ if __name__ == '__main__':
         #                                             selection_rate=selection_rate, save=True)
         
         # Competing; GSLF
-        # cnn_subnetworks_evaluation_circle_competing(feature_cm='pcc',
-        #                                             model='Generalized_Surface_Laplacian', model_fm='advanced', # 'basic', 'advanced'
-        #                                             param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
-        #                                             subject_range=range(6,16),
-        #                                             subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-        #                                             selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Generalized_Surface_Laplacian', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; GLF
-        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='pcc',
-        #                                                           model='Graph_Laplacian_filtering', model_fm='basic', # 'basic', 'advanced'
-        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
-        #                                                           subject_range=range(6,16),
-        #                                                           subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-        #                                                           selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Graph_Laplacian_filtering', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; SLF
-        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
-                                                                 method='Surface_Laplacian_Filtering', 
-                                                                 subject_range=range(6,16), 
-                                                                 subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-                                                                 selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+        #                                                          method='Surface_Laplacian_Filtering', 
+        #                                                          subject_range=range(6,16), 
+        #                                                          subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+        #                                                          selection_rate=selection_rate, save=True)
         
-        # competing; SSD
-        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
-                                                                 method='Spatio_Spectral_Decomposition', 
-                                                                 subject_range=range(6,16), 
-                                                                 subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
-                                                                 selection_rate=selection_rate, save=True)
+        # # competing; SSD
+        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+        #                                                          method='Spatio_Spectral_Decomposition', 
+        #                                                          subject_range=range(6,16), 
+        #                                                          subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
+        #                                                          selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

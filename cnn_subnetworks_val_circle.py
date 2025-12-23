@@ -577,11 +577,11 @@ if __name__ == '__main__':
     
     for selection_rate in selection_rate_list:
         # DM-RCs
-        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', # 'basic'; 'advanced'
-                                                    model_rcm='linear_ratio', # 'linear'; 'linear_ratio'
-                                                    feature_cm='plv', subject_range=range(6, 16), 
-                                                    subnetworks_extract='separate_index',
-                                                    selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', # 'basic'; 'advanced'
+        #                                             model_rcm='linear_ratio', # 'linear'; 'linear_ratio'
+        #                                             feature_cm='plv', subject_range=range(6, 16), 
+        #                                             subnetworks_extract='separate_index',
+        #                                             selection_rate=selection_rate, save=True)
         
         # Competing; GSLF
         # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
@@ -608,12 +608,12 @@ if __name__ == '__main__':
         #                                                          subnetworks_extract='separate_index',
         #                                                          selection_rate=selection_rate, save=True)
         
-        # # competing; SSD
-        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
-        #                                                          method='Spatio_Spectral_Decomposition', 
-        #                                                          subject_range=range(6,16), 
-        #                                                          subnetworks_extract='separate_index',
-        #                                                          selection_rate=selection_rate, save=True)
+        # competing; SSD
+        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
+                                                                 method='Spatio_Spectral_Decomposition', 
+                                                                 subject_range=range(6,16), 
+                                                                 subnetworks_extract='separate_index',
+                                                                 selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions

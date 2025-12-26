@@ -150,7 +150,7 @@ def cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc',
         folder_name='functional_connectivity_ssded'
         
     if subnetworks_extract == 'unify_index':
-        fcs_global_averaged = utils_feature_loading.read_fcs_global('seed', feature_cm, 'joint', subnets_exrtact_basis_sub)
+        fcs_global_averaged = utils_feature_loading.read_fcs_global_average('seed', feature_cm, 'joint', subnets_exrtact_basis_sub)
         
     elif subnetworks_extract == 'separate_index':
         fcs_global_averaged = read_fcs_global_slf('seed', feature_cm, 'joint', subnets_exrtact_basis_sub, folder_name)
@@ -579,42 +579,42 @@ if __name__ == '__main__':
         # DM-RCs
         # cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', # 'basic'; 'advanced'
         #                                             model_rcm='linear_ratio', # 'linear'; 'linear_ratio'
-        #                                             feature_cm='plv', subject_range=range(6, 16), 
-        #                                             subnetworks_extract='separate_index',
+        #                                             feature_cm='pcc', subject_range=range(6, 16), 
+        #                                             subnetworks_extract='unify_index', # 'separate_index'
         #                                             selection_rate=selection_rate, save=True)
         
         # Competing; GSLF
-        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-        #                                                           model='Generalized_Surface_Laplacian', model_fm='basic', 
-        #                                                           # 'basic', 'advanced'
-        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
-        #                                                           subject_range=range(6,16),
-        #                                                           subnetworks_extract='separate_index',
-        #                                                           selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Generalized_Surface_Laplacian', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='unify_index', # 'separate_index',
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; GLF
-        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-        #                                                           model='Graph_Laplacian_filtering', model_fm='basic', 
-        #                                                           # 'basic', 'advanced'
-        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)_kernel_norm',
-        #                                                           subject_range=range(6,16),
-        #                                                           subnetworks_extract='separate_index',
-        #                                                           selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Graph_Laplacian_filtering', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='unify_index', # 'separate_index',
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; SLF
         # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
         #                                                          method='Surface_Laplacian_Filtering', 
         #                                                          subject_range=range(6,16), 
-        #                                                          subnetworks_extract='separate_index',
+        #                                                          subnetworks_extract='unify_index', # 'separate_index'
         #                                                          selection_rate=selection_rate, save=True)
         
         # competing; SSD
-        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
-                                                                 method='Spatio_Spectral_Decomposition', 
-                                                                 subject_range=range(6,16), 
-                                                                 subnetworks_extract='separate_index',
-                                                                 selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+        #                                                          method='Spatio_Spectral_Decomposition', 
+        #                                                          subject_range=range(6,16), 
+        #                                                          subnetworks_extract='unify_index', # 'separate_index'
+        #                                                          selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)

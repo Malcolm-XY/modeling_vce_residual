@@ -177,46 +177,6 @@ def compute_distance_matrix(dataset, projection_params=None, visualize=False, c=
         dist_mat = np.arccos(dot)
         coords2d = np.stack([x, y], axis=-1)
 
-    elif proj_type == '2d_flat':
-        coords2d = np.stack([x, y], axis=-1)
-        diff = coords2d[:, None, :] - coords2d[None, :, :]
-        dist_mat = np.linalg.norm(diff, axis=-1)
-
-    elif proj_type == '2d_stereographic':
-        f = projection_params.get('focal_length', 1.0)
-        m = projection_params.get('max_scaling', 5.0)
-        z_norm = (z - z.min()) / (z.max() - z.min() + 1e-6)
-        scale = f / (f - z_norm + 1e-6)
-        scale = np.clip(scale, 0, m)
-        coords2d = np.stack([x * scale, y * scale], axis=-1)
-        diff = coords2d[:, None, :] - coords2d[None, :, :]
-        dist_mat = np.linalg.norm(diff, axis=-1)
-
-    elif proj_type == '2d_azimuthal':
-        unit = coords3d / np.linalg.norm(coords3d, axis=1, keepdims=True)
-        xu, yu, zu = unit[:, 0], unit[:, 1], unit[:, 2]
-        theta = np.arccos(zu)
-        phi = np.arctan2(yu, xu)
-        x_proj = theta * np.cos(phi)
-        y_proj = theta * np.sin(phi)
-
-        x_norm = (x_proj - np.min(x_proj)) / (np.ptp(x_proj) + 1e-6)
-        y_norm = (y_proj - np.min(y_proj)) / (np.ptp(y_proj) + 1e-6)
-
-        factor = projection_params.get('y_compression_factor', 1.0)
-        direction = projection_params.get('y_compression_direction', 'positive')
-        y_offset = y_norm - 0.5
-        if factor != 1.0:
-            if direction == 'positive':
-                y_offset[y_offset > 0] *= factor
-            elif direction == 'negative':
-                y_offset[y_offset < 0] *= factor
-            y_norm = 0.5 + y_offset
-
-        coords2d = np.stack([x_norm, y_norm], axis=-1)
-        diff = coords2d[:, None, :] - coords2d[None, :, :]
-        dist_mat = np.linalg.norm(diff, axis=-1)
-
     else:
         raise ValueError(f"Unsupported projection type: {proj_type}")
 

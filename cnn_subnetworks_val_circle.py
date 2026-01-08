@@ -224,7 +224,7 @@ def cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc',
     if save:
         folder_name = 'results_cnn_subnetwork_evaluation'
         file_name = f'cnn_validation_SubRCM_{feature_cm}_by_{method}_rcm.xlsx'
-        sheet_name = f'GLF_sr_{selection_rate}'
+        sheet_name = f'sr_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
         
@@ -350,7 +350,7 @@ def cnn_subnetworks_evaluation_circle_competing_network_level(projection_params=
     if save:
         folder_name = 'results_cnn_subnetwork_evaluation'
         file_name = f'cnn_validation_SubRCM_{feature_cm}_by_{model}_rcm.xlsx'
-        sheet_name = f'GLF_sr_{selection_rate}'
+        sheet_name = f'sr_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
         
@@ -488,6 +488,7 @@ def cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='lin
                                                 feature_cm='pcc', subject_range=range(6,16), 
                                                 subnetworks_extract='separate_index', selection_rate=1, save=False):
     model = list(['exponential', 'gaussian', 'inverse', 'power_law', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
+    model = list(['exponential', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
     
     results_fitting = {}
     for trail in range(0, 7):       
@@ -577,29 +578,29 @@ if __name__ == '__main__':
     
     for selection_rate in selection_rate_list:
         # DM-RCs
-        # cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', # 'basic'; 'advanced'
-        #                                             model_rcm='linear_ratio', # 'linear'; 'linear_ratio'
-        #                                             feature_cm='pcc', subject_range=range(6, 16), 
-        #                                             subnetworks_extract='unify_index', # 'separate_index'
-        #                                             selection_rate=selection_rate, save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', # 'basic'; 'advanced'
+                                                    model_rcm='linear', # 'linear'; 'linear_ratio'
+                                                    feature_cm='pcc', subject_range=range(6, 16), 
+                                                    subnetworks_extract='separate_index', # 'separate_index'
+                                                    selection_rate=selection_rate, save=True)
         
         # Competing; GSLF
-        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-                                                                  model='Generalized_Surface_Laplacian', model_fm='basic', 
-                                                                  # 'basic', 'advanced'
-                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
-                                                                  subject_range=range(6,16),
-                                                                  subnetworks_extract='unify_index', # 'separate_index',
-                                                                  selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+        #                                                           model='Generalized_Surface_Laplacian', model_fm='basic', 
+        #                                                           # 'basic', 'advanced'
+        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)',
+        #                                                           subject_range=range(6,16),
+        #                                                           subnetworks_extract='unify_index', # 'separate_index',
+        #                                                           selection_rate=selection_rate, save=True)
         
         # competing; GLF
-        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-                                                                  model='Graph_Laplacian_filtering', model_fm='basic', 
-                                                                  # 'basic', 'advanced'
-                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
-                                                                  subject_range=range(6,16),
-                                                                  subnetworks_extract='unify_index', # 'separate_index',
-                                                                  selection_rate=selection_rate, save=True)
+        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+        #                                                           model='Graph_Laplacian_filtering', model_fm='basic', 
+        #                                                           # 'basic', 'advanced'
+        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)',
+        #                                                           subject_range=range(6,16),
+        #                                                           subnetworks_extract='unify_index', # 'separate_index',
+        #                                                           selection_rate=selection_rate, save=True)
         
         # competing; SLF
         # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
@@ -609,7 +610,7 @@ if __name__ == '__main__':
         #                                                          selection_rate=selection_rate, save=True)
         
         # competing; SSD
-        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='pcc', 
+        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
         #                                                          method='Spatio_Spectral_Decomposition', 
         #                                                          subject_range=range(6,16), 
         #                                                          subnetworks_extract='unify_index', # 'separate_index'

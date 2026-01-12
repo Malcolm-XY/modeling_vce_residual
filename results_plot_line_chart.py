@@ -271,11 +271,81 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     fig.tight_layout()
     plt.show()
 
-# %% -----------------------------
-def accuracy_partia(feature='pcc', model='basic', f1score=False):
-    # color map
-    cmap = plt.colormaps['tab20_r']
+def plot_bars_compact(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs", dv: str = "data", std: str = "stds",
+                      xlabel="xlabel", ylabel="ylabel", ylim=(30, 100), figsize=(12, 4.5), bar_width = 0.15, 
+                      color_bar: str = "auto", bar_colors = None, cmap=plt.colormaps['viridis'], hatchs = None):
+    method_order = df[identifier].drop_duplicates().tolist()
+    iv_order = df[iv].drop_duplicates().tolist()
+
+    n_methods = len(method_order)
+    n_srs = len(iv_order)
+
+    bar_width = bar_width
+    x = np.arange(n_srs)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    if color_bar == "manual":
+        if bar_colors is None: 
+            bar_colors = ['skyblue'] * (n_methods-1) + ['orange']
+    elif color_bar == "auto":
+        bar_colors = []
+        if cmap is None: 
+            cmap=cm.get_cmap('viridis')
+        for i in range(n_methods):
+            color_value = i / max((n_methods - 1), 1)
+            bar_colors.append(cmap(color_value))
     
+    bars = []
+    for i, method in enumerate(method_order):
+        sub = df[df[identifier] == method].set_index(iv).loc[iv_order]
+    
+        bars_ = ax.bar(
+            x + i * bar_width,
+            sub[dv],
+            yerr=sub[std],
+            width=bar_width,
+            color=bar_colors[i],
+            capsize=3,
+            label=method,
+            hatch=hatchs[i] if hatchs is not None else None
+        )
+    
+        # ensure hatch is visible
+        for bar in bars_:
+            bar.set_edgecolor("white")
+    
+        bars.append(bars_)
+
+    
+    ax.set_xticks(x + bar_width * (n_methods - 1) / 2)
+    ax.set_xticklabels(iv_order)
+
+    # 左 y 轴
+    ax.set_ylim(*ylim)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+
+    # ===== 右 y 轴（关键）=====
+    ax_r = ax.twinx()
+    ax_r.set_ylim(*ylim)
+    ax_r.set_yticks(ax.get_yticks())
+    ax_r.set_yticklabels([f"{int(t)}" for t in ax.get_yticks()])
+    ax_r.set_ylabel("")   # 通常不写右轴 label
+
+    # legend
+    ax.legend(
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.15),
+        ncol=3,
+        frameon=False
+    )
+
+    plt.tight_layout()
+    plt.show()
+
+# %% -----------------------------
+def accuracy_partia(feature='pcc', model='basic', f1score=False, cmap=plt.colormaps['viridis'], hatchs = ['', '/', '', '/'] * 10):
     # import data
     if feature == 'pcc':
         if model == 'basic':
@@ -302,6 +372,10 @@ def accuracy_partia(feature='pcc', model='basic', f1score=False):
                         ylabel="Accuracy Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
                         cmap=cmap, use_alt_linestyles=True)
     
+    plot_bars_compact(df_accuracy, dv='data', std='stds',
+                      ylabel="Average Accuracy (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
+                          cmap=cmap, ylim=(30, 100), figsize=(15, 5), bar_width=0.1, hatchs=hatchs)
+    
     # f1 score
     df_f1score=None
     if f1score:
@@ -320,10 +394,7 @@ def accuracy_partia(feature='pcc', model='basic', f1score=False):
     
     return df_accuracy, df_f1score
 
-def sbpe_partia(feature='pcc', model='basic'):
-    # color map
-    cmap = plt.colormaps['tab20_r']
-    
+def sbpe_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis']):
     # import data
     if feature == 'pcc':
         if model == 'basic':
@@ -366,12 +437,7 @@ def sbpe_partia(feature='pcc', model='basic'):
     
     return df_augmented
 
-def mbpe_partia(feature='pcc', model='basic'):
-    # color map
-    cmap = plt.colormaps['tab20_r']
-    # hatchs
-    hatchs = ['', '/', '', '/'] * 10
-    
+def mbpe_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatchs = ['', '/', '', '/'] * 10):
     # import data
     if feature == 'pcc':
         if model == 'basic':
@@ -414,179 +480,72 @@ def mbpe_partia(feature='pcc', model='basic'):
               mode="ci", n=30, 
               color_bar="auto", cmap=cmap,
               ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="FN Recovery Methods",
-              xtick_rotation=30, wrap_width=30, figsize=(10,10), lower_limit=70, hatchs=hatchs)
+              xtick_rotation=30, wrap_width=30, figsize=(15,10), lower_limit=70, hatchs=hatchs)
     
     return df_augmented
-    
-# %% -----------------------------
-def accuracy_selected():
-    # color bars; plot settings
-    from matplotlib.colors import ListedColormap
-    
-    cmap = ListedColormap([
-        "lightsteelblue", # "#6A5ACD",  # PLI
-        "limegreen", "green",  # PCC
-        "salmon", "crimson"   # PLV
-    ])
-    
-    linestyles = ['--', '--', '-', '--', '-']
-    # end
-    
-    # data
-    from results_summary import selected_data
-    
-    # accuracy
-    accuracy_dic = selected_data.accuracy
-    df_accuracy = pd.DataFrame(accuracy_dic)
-    
-    plot_lines_with_band(df_accuracy, dv='data', std='stds', 
-                        mode="ci", n=30, 
-                        ylabel="Average Accuracy (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    plot_lines_with_band(df_accuracy, dv='stds', std='stds', 
-                        mode="none", n=1, 
-                        ylabel="Accuracy Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    # f1 score
-    f1score_dic = selected_data.f1score
-    df_f1score = pd.DataFrame(f1score_dic)
-    
-    plot_lines_with_band(df_f1score, dv='data', std='stds', 
-                        mode="ci", n=30, 
-                        ylabel="Average F1 Score (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    plot_lines_with_band(df_f1score, dv='stds', std='stds', 
-                        mode="none", n=1, 
-                        ylabel="F1 Score Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    return df_accuracy, df_f1score
 
-def accuracy_appendix(method='glf', feature='pcc'):
-    # color bars; plot settings
-    from matplotlib.colors import ListedColormap
-    
-    cmap = ListedColormap([
-        "lightsteelblue", "blue",
-        "limegreen", "salmon",
-        "lightsteelblue", "blue",
-        "limegreen", "salmon",
-    ])
-    
-    linestyles = ['-', '-', '-', '-', '--', '--', '--', '--']
-    # end
-    
-    # data
-    if method == 'glf' and feature =='pcc':
-        from results_appendix import glf_pcc as data
-    elif method == 'glf' and feature == 'plv':
-        from results_appendix import glf_plv as data
-    
-    # accuracy; pcc
-    accuracy_dic = data.accuracy
-    df_accuracy = pd.DataFrame(accuracy_dic)
-    
-    plot_lines_with_band(df_accuracy, dv='data', std='stds', 
-                        mode="ci", n=30, 
-                        ylabel="Average Accuracy (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    plot_lines_with_band(df_accuracy, dv='stds', std='stds', 
-                        mode="none", n=1, 
-                        ylabel="Accuracy Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    # f1 score; pcc
-    f1score_dic = data.f1score
-    df_f1score = pd.DataFrame(f1score_dic)
-    
-    plot_lines_with_band(df_f1score, dv='data', std='stds', 
-                        mode="ci", n=30, 
-                        ylabel="Average F1 Score (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    plot_lines_with_band(df_f1score, dv='stds', std='stds', 
-                        mode="none", n=1, 
-                        ylabel="F1 Score Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, linestyles=linestyles)
-    
-    return df_accuracy, df_f1score
-
-def mbpe_appendix(method='glf',feature='pcc'):
-    # color bars; plot settings
-    from matplotlib.colors import ListedColormap
-    
-    cmap = ListedColormap([
-        "lightsteelblue", "blue",
-        "limegreen", "salmon",
-        "lightsteelblue", "blue",
-        "limegreen", "salmon",
-    ])
-    # hatchs
-    hatchs = ['', '', '', '', '/', '/', '/', '/']
-    
+def auc_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatchs = ['', '/', '', '/'] * 10):
     # import data
-    if method == 'glf' and feature =='pcc':
-        from results_appendix import glf_pcc as data
-        xlabel="Parameter Settings of Graph Laplacian Filtering"
-    elif method == 'glf' and feature == 'plv':
-        from results_appendix import glf_plv as data
-        xlabel="Parameter Settings of Graph Laplacian Filtering"
+    if feature == 'pcc':
+        if model == 'basic':
+            from results_summary import partia_data_pcc as partia_data
+        elif model == 'advanced':
+            from results_summary import partia_data_pcc_ad as partia_data
+    elif feature == 'plv':
+        if model == 'basic':
+            from results_summary import partia_data_plv as partia_data
+        elif model == 'advanced':
+            from results_summary import partia_data_plv_ad as partia_data
     
-    accuracy_dic = data.accuracy
+    accuracy_dic = partia_data.accuracy
     df_accuracy = pd.DataFrame(accuracy_dic)
     
-    mbpe, mbpe_std = [], []
+    auc, auc_std = [], []
     for method, sub in df_accuracy.groupby("identifier", sort=False):
         sub = sub.sort_values("srs", ascending=False)
         srs = sub["srs"].to_numpy()
         accuracies = sub["data"].to_numpy()
         stds = sub["stds"].to_numpy()
         
-        mbpe_ = balanced_performance_efficiency_multiple_points(srs, accuracies)
-        mbpe_std_ = balanced_performance_efficiency_multiple_points(srs, stds)
+        auc_ = selection_robust_auc(srs, accuracies)
+        auc_std_ = selection_robust_auc(srs, stds)
         
         # print(srs)
         # print(accuracies)
-        print(f"Methods: {method}", f"MBPE: {mbpe_}")
+        print(f"Methods: {method}", f"MBPE: {auc_}")
         
-        mbpe_ = [mbpe_] * len(accuracies)
-        mbpe_std_ = [mbpe_std_] * len(accuracies)
+        auc_ = [auc_] * len(accuracies)
+        auc_std_ = [auc_std_] * len(accuracies)
         
-        mbpe.extend(mbpe_)
-        mbpe_std.extend(mbpe_std_)
+        auc.extend(auc_)
+        auc_std.extend(auc_std_)
     
-    mbpe_dic = {"MBPEs": mbpe, "MBPE_stds": mbpe_std}
-    df_augmented = pd.concat([df_accuracy, pd.DataFrame(mbpe_dic)], axis=1)
+    auc_dic = {"AUCs": auc, "AUC_stds": auc_std}
+    df_augmented = pd.concat([df_accuracy, pd.DataFrame(auc_dic)], axis=1)
 
-    plot_bars(df_augmented, dv="MBPEs", std="MBPE_stds", 
+    plot_bars(df_augmented, dv="AUCs", std="AUC_stds", 
               mode="ci", n=30, 
               color_bar="auto", cmap=cmap,
-              ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel=xlabel,
-              xtick_rotation=30, wrap_width=30, figsize=(10,10), lower_limit=70, hatchs=hatchs)
+              ylabel="AUC (Area Under the Curve) (%)", xlabel="FN Recovery Methods",
+              xtick_rotation=30, wrap_width=30, figsize=(15,10), lower_limit=70, hatchs=hatchs)
     
     return df_augmented
 
 # %% main
-if __name__ == "__main__":   
+if __name__ == "__main__":
     # %% partia_basic
-    accuracy_pcc, f1score_pcc = accuracy_partia('pcc')
-    df_sbpe = sbpe_partia('pcc')
-    df_mbpe = mbpe_partia('pcc')
+    # color map
+    # cmap = plt.colormaps['tab20_r']
+    cmap = plt.colormaps['viridis_r']
     
-    from results_plot_p_matrix import plot_basic_models_comparison
-    plot_basic_models_comparison()
+    # hatchs
+    hatchs = ['/', '', '', '', '', '/', '/', '/', '/'] * 10
     
-    # %% partia_advanced
-    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', 'advanced')
-    df_sbpe = sbpe_partia('pcc', 'advanced')
-    df_mbpe = mbpe_partia('pcc', 'advanced')
+    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', cmap=cmap, hatchs=hatchs)
+    df_sbpe = sbpe_partia('pcc', cmap=cmap)
+    df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
-    from results_plot_p_matrix import plot_advanced_models_comparison
-    plot_advanced_models_comparison()
+    auc_partia('pcc', cmap=cmap, hatchs=hatchs)
     
-    # %% selected
-    # acc, f1 = accuracy_selected()
+    # from results_plot_p_matrix import plot_basic_models_comparison
+    # plot_basic_models_comparison()

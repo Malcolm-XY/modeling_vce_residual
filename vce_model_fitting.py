@@ -266,6 +266,224 @@ class FittingConfig:
             'param_names': ['sigma', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0)],
         },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_advanced_model_linear_recovery = {
+        'Exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Power_Law': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_ratio_recovery = {
+        'Exponential': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Gaussian': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Inverse': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Power_Law': {
+            'param_names': ['alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+    }
+
+    config_advanced_model_linear_ratio_recovery = {
+        'Exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Power_Law': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+    }
+
+class FittingConfig_:
+    """
+    Configuration for fitting models.
+    Provides param_names, bounds, and automatic param_func.
+    """
+    
+    @staticmethod
+    def get_config(model_type: str, recovery_type: str):
+        """
+        Get the config dictionary based on model type and recovery type.
+    
+        Args:
+            model_type (str): 'basic' or 'advanced'
+            recovery_type (str): 'differ', 'linear', or 'linear_ratio'
+    
+        Returns:
+            dict: Corresponding config dictionary
+    
+        Raises:
+            ValueError: If input type is invalid
+        """
+        model_type = model_type.lower()
+        recovery_type = recovery_type.lower()
+    
+        if model_type == 'basic' and recovery_type == 'differ':
+            return FittingConfig.config_basic_model_differ_recovery
+        elif model_type == 'advanced' and recovery_type == 'differ':
+            return FittingConfig.config_advanced_model_differ_recovery
+        elif model_type == 'basic' and recovery_type == 'linear':
+            return FittingConfig.config_basic_model_linear_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear':
+            return FittingConfig.config_advanced_model_linear_recovery
+        elif model_type == 'basic' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_basic_model_linear_ratio_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_advanced_model_linear_ratio_recovery
+        else:
+            raise ValueError(f"Invalid model_type '{model_type}' or recovery_type '{recovery_type}'")
+    
+    @staticmethod
+    def make_param_func(param_names):
+        """Auto-generate param_func based on param_names."""
+        return lambda p: {name: p[i] for i, name in enumerate(param_names)}
+
+    config_basic_model_differ_recovery = {
+        'Exponential': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'Gaussian': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'Inverse': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'Power_Law': {
+            'param_names': ['alpha'],
+            'bounds': [(0.1, 10.0)],
+        },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0)],
+        },
+    }
+
+    config_advanced_model_differ_recovery = {
+        'Exponential': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'Power_Law': {
+            'param_names': ['alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'Rational_Quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'Generalized_Gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'Sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_recovery = {
+        'Exponential': {
+            'param_names': ['sigma', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
+        },
         'Gaussian': {
             'param_names': ['sigma', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0)],
@@ -1213,7 +1431,7 @@ if __name__ == '__main__':
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
     results_best, cis_best, _, cis_all = fitting_model_best(fm_model, rcm_model, 
-                                                            ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=1)
+                                                            ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
     
     # %% Insert reference (LDMI) and initial ci (CM)
     ci_initial_model = np.mean(cm_global_averaged, axis=0)
@@ -1228,10 +1446,10 @@ if __name__ == '__main__':
     _, cis_sorted = process_optimized_channel_importances(cis_fitted_with_initial_reference, channel_manual_remove)
     
     # %% Save
-    # path_currebt = os.getcwd()
-    # results_path = os.path.join(os.getcwd(), 'fitted_results')
-    # save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
-    # save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    path_currebt = os.getcwd()
+    results_path = os.path.join(os.getcwd(), 'fitted_results')
+    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
     # %% Validation of Fitted Comparison
     # joint scatter

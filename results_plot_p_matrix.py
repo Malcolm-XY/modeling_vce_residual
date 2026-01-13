@@ -441,6 +441,67 @@ def plot_diff_p_heatmap(
 
     plt.show()
 
+# %% ANOVA
+import pandas as pd
+from statsmodels.stats.anova import AnovaRM
+def anova_repeated_measures_pairwise(df_1, df_2):
+    def prepare_rm_anova_df(df, method_name, srs_order):
+        s = len(srs_order)
+        n = len(df) // s
+    
+        out = df.copy()
+        out['method'] = method_name
+        out['run'] = (
+            out.index // s
+        ) + 1
+    
+        return out[['run', 'method', 'srs', 'data']]
+    
+    srs_order = df_1['srs'].unique()
+    
+    df_1_rm = prepare_rm_anova_df(df_1, 'df1', srs_order)
+    df_2_rm = prepare_rm_anova_df(df_2, 'df2', srs_order)
+    
+    df_all = pd.concat([df_1_rm, df_2_rm], ignore_index=True)
+    
+    aov = AnovaRM(
+    df_all,
+    depvar='data',
+    subject='run',
+    within=['method', 'srs']
+    ).fit()
+    
+    print(aov)
+    
+    return aov
+
+def anova_repeated_measures(dfs):
+    def prepare_rm_anova_df(df, srs_order):
+        s = len(srs_order)
+    
+        out = df.copy()
+        out['run'] = (out.index // s) + 1
+    
+        return out
+    
+    srs_order = dfs[0]['srs'].unique()
+    
+    df_all = pd.DataFrame([])
+    for i, df in enumerate(dfs):
+        df_rm = prepare_rm_anova_df(df, srs_order)
+        df_all = pd.concat([df_all, df_rm], ignore_index=True)
+    
+    aov = AnovaRM(
+    df_all,
+    depvar='data',
+    subject='run',
+    within=['identifier', 'srs']
+    ).fit()
+    
+    print(aov)
+    
+    return aov
+
 # %% Basic Model
 def plot_basic_models_comparison():
     from results_append import accuracy_original as bl
@@ -482,5 +543,5 @@ def plot_basic_models_comparison():
     plot_diff_p_heatmap(df_paired_p_matrix, df_mean_diff)
 
 # %% main
-if __name__ == "__main__":    
+if __name__ == "__main___":    
     plot_basic_models_comparison()

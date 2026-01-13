@@ -585,13 +585,13 @@ if __name__ == '__main__':
                                                     selection_rate=selection_rate, save=True)
         
         # Competing; GSLF
-        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-        #                                                           model='Generalized_Surface_Laplacian', model_fm='basic', 
-        #                                                           # 'basic', 'advanced'
-        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)',
-        #                                                           subject_range=range(6,16),
-        #                                                           subnetworks_extract='unify_index', # 'separate_index',
-        #                                                           selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Generalized_Surface_Laplacian', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='unify_index', # 'separate_index',
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; GLF
         # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',

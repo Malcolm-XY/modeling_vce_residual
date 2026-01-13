@@ -481,46 +481,6 @@ def plot_basic_models_comparison():
     plot_rel_e_heatmap(-df_effect_size, df_relative_gain)
     plot_diff_p_heatmap(df_paired_p_matrix, df_mean_diff)
 
-def plot_advanced_models_comparison():
-    from results_append import accuracy_original as bl
-    from results_append import accuracy_ad_generalized_surface_laplacian as gsf
-    
-    from results_append import accuracy_ad_residual_exponential as exp
-    from results_append import accuracy_ad_residual_gaussian as gaus
-    from results_append import accuracy_ad_residual_power_law as pl
-    from results_append import accuracy_ad_residual_rational_quadratic as rq
-    
-    i_bl = bl['identifier']
-    mbpe_ave_bl, mbpe_bl = mbpe_for_data(bl)
-    i_glf = gsf['identifier']
-    mbpe_ave_gsf, mbpe_gsf = mbpe_for_data(gsf)
-    
-    i_exp = exp['identifier']
-    mbpe_ave_exp, mbpe_exp = mbpe_for_data(exp)
-    i_gaus = gaus['identifier']
-    mbpe_ave_gaus, mbpe_gaus = mbpe_for_data(gaus)
-    
-    i_pl = pl['identifier']
-    mbpe_ave_pl, mbpe_pl = mbpe_for_data(pl)
-    i_rq = rq['identifier']
-    mbpe_ave_rq, mbpe_rq = mbpe_for_data(rq)
-    
-    data = {
-        i_exp: mbpe_exp,
-        i_gaus: mbpe_gaus,
-        i_pl: mbpe_pl,
-        i_rq: mbpe_rq,
-        
-        i_glf: mbpe_gsf,
-        i_bl: mbpe_bl,
-        }
-    
-    df_mean_diff, df_relative_gain, df_p_matrix, df_paired_p_matrix, df_effect_size = compare_methods(data)
-    
-    plot_rel_e_heatmap(-df_effect_size, df_relative_gain)
-    plot_diff_p_heatmap(df_paired_p_matrix, df_mean_diff)
-
 # %% main
 if __name__ == "__main__":    
     plot_basic_models_comparison()
-    # plot_advanced_models_comparison()

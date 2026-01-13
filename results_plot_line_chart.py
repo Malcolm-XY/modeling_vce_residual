@@ -13,7 +13,7 @@ def selection_robust_auc(srs, accuracies):
         auc = (srs[i]-srs[i+1]) * (accuracies[i]+accuracies[i+1])/2
         aucs.append(auc)
         
-    auc = np.sum(aucs) * 1/(srs[0]-srs[-1])
+    auc = np.sum(aucs)/(srs[0]-srs[-1])
     
     return auc
 
@@ -533,7 +533,6 @@ def auc_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatc
 
 # %% main
 if __name__ == "__main__":
-    # %% partia_basic
     # color map
     # cmap = plt.colormaps['tab20_r']
     cmap = plt.colormaps['viridis_r']
@@ -541,11 +540,19 @@ if __name__ == "__main__":
     # hatchs
     hatchs = ['/', '', '', '', '', '/', '/', '/', '/'] * 10
     
+    # pcc
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc', cmap=cmap, hatchs=hatchs)
-    df_sbpe = sbpe_partia('pcc', cmap=cmap)
-    df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
+    # df_sbpe = sbpe_partia('pcc', cmap=cmap)
+    # df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
     auc_partia('pcc', cmap=cmap, hatchs=hatchs)
+    
+    # plv
+    accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs)
+    # df_sbpe = sbpe_partia('plv', cmap=cmap)
+    # df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
+    
+    auc_partia('plv', cmap=cmap, hatchs=hatchs)
     
     # from results_plot_p_matrix import plot_basic_models_comparison
     # plot_basic_models_comparison()

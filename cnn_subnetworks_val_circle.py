@@ -594,28 +594,28 @@ if __name__ == '__main__':
                                                                   selection_rate=selection_rate, save=True)
         
         # competing; GLF
-        # cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
-        #                                                           model='Graph_Laplacian_filtering', model_fm='basic', 
-        #                                                           # 'basic', 'advanced'
-        #                                                           param='fitted_results_competing(sub1_sub5_joint_band)',
-        #                                                           subject_range=range(6,16),
-        #                                                           subnetworks_extract='unify_index', # 'separate_index',
-        #                                                           selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_network_level(feature_cm='plv',
+                                                                  model='Graph_Laplacian_filtering', model_fm='basic', 
+                                                                  # 'basic', 'advanced'
+                                                                  param='fitted_results_competing(sub1_sub5_joint_band)',
+                                                                  subject_range=range(6,16),
+                                                                  subnetworks_extract='unify_index', # 'separate_index',
+                                                                  selection_rate=selection_rate, save=True)
         
         # competing; SLF
-        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
-        #                                                          method='Surface_Laplacian_Filtering', 
-        #                                                          subject_range=range(6,16), 
-        #                                                          subnetworks_extract='unify_index', # 'separate_index'
-        #                                                          selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
+                                                                 method='Surface_Laplacian_Filtering', 
+                                                                 subject_range=range(6,16), 
+                                                                 subnetworks_extract='unify_index', # 'separate_index'
+                                                                 selection_rate=selection_rate, save=True)
         
         # competing; SSD
-        # cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
-        #                                                          method='Spatio_Spectral_Decomposition', 
-        #                                                          subject_range=range(6,16), 
-        #                                                          subnetworks_extract='unify_index', # 'separate_index'
-        #                                                          selection_rate=selection_rate, save=True)
+        cnn_subnetworks_evaluation_circle_competing_signal_level(feature_cm='plv', 
+                                                                 method='Spatio_Spectral_Decomposition', 
+                                                                 subject_range=range(6,16), 
+                                                                 subnetworks_extract='unify_index', # 'separate_index'
+                                                                 selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

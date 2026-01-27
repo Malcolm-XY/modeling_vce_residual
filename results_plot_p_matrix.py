@@ -52,6 +52,33 @@ def mbpe_for_data(data_dict):
     
     return mbpe_averaged, mbpe
 
+# %% AUC
+def selection_robust_auc(srs, accuracies):
+    aucs = []
+    n = len(srs) - 1
+    for i in range(n):
+        auc = (srs[i]-srs[i+1]) * (accuracies[i]+accuracies[i+1])/2
+        aucs.append(auc)
+        
+    auc = np.sum(aucs)/(srs[0]-srs[-1])
+    
+    return auc
+
+def auc_for_data(data_dict):
+    _, df = read_data(data_dict)
+    
+    auc = []
+    for index, group in df.iterrows():
+        srs_ = group.keys()
+        data_ = group.tolist()
+        
+        auc_ = selection_robust_auc(srs_, data_)
+        auc.append(auc_)
+    
+    auc_averaged = np.mean(auc)
+    
+    return auc_averaged, auc
+
 # %% P-Matrices
 from scipy.stats import ttest_ind, ttest_rel
 def compare_methods(data, alpha=0.05):
@@ -115,7 +142,12 @@ def plot_rel_e_heatmap(
     fmt_rel: str = ".2%",
     fmt_e: str = ".2f",
     same_cmap: bool = False,
-    draw_diagonal: bool = True
+    draw_diagonal: bool = True,
+    text_size=9,
+    text_invisible=False,
+    effect_threshould_invisible="auto",
+    rel_threshould_invisible="auto",
+    threshould_invisible_rate=0.7,
 ):
     import textwrap
 
@@ -199,7 +231,12 @@ def plot_rel_e_heatmap(
 
     # —— 文本标注 —— 
     annot = np.empty((k, k), dtype=object)
-
+    
+    if effect_threshould_invisible == "auto":
+        effect_threshould_invisible = threshould_invisible_rate * np.max(effect_df)
+    if rel_threshould_invisible == "auto":
+        rel_threshould_invisible = threshould_invisible_rate * np.max(rel_df)
+        
     for i in range(k):
         for j in range(k):
             if i == j:
@@ -208,11 +245,23 @@ def plot_rel_e_heatmap(
                 # 上三角：行 − 列
                 r = rel_df.iloc[i, j]
                 arrow = "↑" if r > 0 else ("↓" if r < 0 else "")
-                annot[i, j] = f"{r:{fmt_rel}}{arrow}"
+                if text_invisible==False:
+                    annot[i, j] = f"{r:{fmt_rel}}{arrow}"
+                elif text_invisible==True:
+                    if np.abs(r) < np.abs(rel_threshould_invisible):    
+                        annot[i, j] = f"{arrow}"
+                    else:
+                        annot[i, j] = f"{r:{fmt_rel}}{arrow}"
             else:
                 # 下三角：列 − 行（效应量原符号）
                 e = effect_df.iloc[i, j]
-                annot[i, j] = f"{e:{fmt_e}}"
+                if text_invisible==False:
+                    annot[i, j] = f"{e:{fmt_e}}"
+                elif text_invisible==True:
+                    if np.abs(e) < np.abs(effect_threshould_invisible):
+                        annot[i, j] = ""
+                    else: 
+                        annot[i, j] = f"{e:{fmt_e}}"
 
     # —— 根据背景色调整字体颜色 —— 
     cm_diff = plt.cm.get_cmap(cmap_rel)
@@ -245,7 +294,7 @@ def plot_rel_e_heatmap(
                 j + 0.5, i + 0.5,
                 text,
                 ha="center", va="center",
-                fontsize=9,
+                fontsize=text_size,
                 color=font_color
             )
 
@@ -282,7 +331,12 @@ def plot_diff_p_heatmap(
     fmt_diff: str = ".2f",
     fmt_p: str = ".2f",
     same_cmap: bool = False,
-    draw_diagonal: bool = True
+    draw_diagonal: bool = True,
+    text_size=9,
+    text_invisible=False,
+    diff_threshould_invisible="auto",
+    p_threshould_invisible="auto",
+    threshould_invisible_rate=0.7,
 ):
     import textwrap
 
@@ -369,18 +423,32 @@ def plot_diff_p_heatmap(
     
     annot = np.empty((k, k), dtype=object)
 
+    if diff_threshould_invisible == "auto":
+        diff_threshould_invisible = threshould_invisible_rate * np.max(diff_df)
+    if p_threshould_invisible == "auto":
+        p_threshould_invisible = threshould_invisible_rate * np.max(p_df)
+
     for i in range(k):
         for j in range(k):
             if i == j:
                 annot[i, j] = ""
             elif i < j:
                 # 上三角：行 − 列（Δmean）
-                r = diff_df.iloc[i, j]
-                arrow = "↑" if r > 0 else ("↓" if r < 0 else "")
-                annot[i, j] = f"{r:{fmt_diff}}{arrow}"
+                d = diff_df.iloc[i, j]
+                arrow = "↑" if d > 0 else ("↓" if d < 0 else "")
+                if text_invisible==False:
+                    annot[i, j] = f"{d:{fmt_diff}}{arrow}"
+                elif text_invisible==True:
+                    if np.abs(d) < np.abs(diff_threshould_invisible):    
+                        annot[i, j] = f"{arrow}"
+                    else:
+                        annot[i, j] = f"{d:{fmt_diff}}{arrow}"
             else:
                 p = p_to_stars(p_df.iloc[i, j])
-                annot[i, j] = f"{p}"# f"{p:{fmt_p}}"
+                if text_invisible==False:
+                    annot[i, j] = f"{p}" # f"{p:{fmt_p}}"
+                elif text_invisible==True:
+                    annot[i, j] = f"{p}"
 
     # —— 根据背景色调整字体颜色 —— 
     cm_diff = plt.cm.get_cmap(cmap_diff)
@@ -413,7 +481,7 @@ def plot_diff_p_heatmap(
                 j + 0.5, i + 0.5,
                 text,
                 ha="center", va="center",
-                fontsize=9,
+                fontsize=text_size,
                 color=font_color
             )
 
@@ -502,46 +570,77 @@ def anova_repeated_measures(dfs):
     
     return aov
 
-# %% Basic Model
-def plot_basic_models_comparison():
-    from results_append import accuracy_original as bl
-    from results_append import accuracy_bs_generalized_surface_laplacian as gsf
+# %% AUC Comparison
+def plot_auc_comparison(feature='pcc'):
+    from results_append import accuracy_list_pcc
+    from results_append import accuracy_list_plv
+    if feature == 'pcc':
+        [accuracy_original, accuracy_surface_laplacian_filtering, accuracy_spatial_spectral_decomposition,
+         accuracy_generalized_surface_laplacian_filtering, accuracy_graph_laplacian_filtering,
+         accuracy_dmrc_exponential, accuracy_dmrc_rational_quadratic,
+         accuracy_dmrc_generalized_gaussian, accuracy_dmrc_sigmoid] = accuracy_list_pcc
+    elif feature == 'plv':
+        [accuracy_original, accuracy_surface_laplacian_filtering, accuracy_spatial_spectral_decomposition,
+         accuracy_generalized_surface_laplacian_filtering, accuracy_graph_laplacian_filtering,
+         accuracy_dmrc_exponential, accuracy_dmrc_rational_quadratic,
+         accuracy_dmrc_generalized_gaussian, accuracy_dmrc_sigmoid] = accuracy_list_plv
     
-    from results_append import accuracy_bs_residual_exponential as exp
-    from results_append import accuracy_bs_residual_gaussian as gaus
-    from results_append import accuracy_bs_residual_power_law as pl
-    from results_append import accuracy_bs_residual_rational_quadratic as rq
+    accuracy_list = [pd.DataFrame(accuracy_original), 
+                     pd.DataFrame(accuracy_surface_laplacian_filtering), 
+                     pd.DataFrame(accuracy_spatial_spectral_decomposition),
+                     
+                     pd.DataFrame(accuracy_generalized_surface_laplacian_filtering), 
+                     pd.DataFrame(accuracy_graph_laplacian_filtering),
+                     
+                     pd.DataFrame(accuracy_dmrc_exponential),
+                     pd.DataFrame(accuracy_dmrc_rational_quadratic),
+                     pd.DataFrame(accuracy_dmrc_generalized_gaussian), 
+                     pd.DataFrame(accuracy_dmrc_sigmoid)]
     
-    i_bl = bl['identifier']
-    mbpe_ave_bl, mbpe_bl = mbpe_for_data(bl)
-    i_glf = gsf['identifier']
-    mbpe_ave_gsf, mbpe_gsf = mbpe_for_data(gsf)
+    rm_anova = anova_repeated_measures(accuracy_list).anova_table
+    print(rm_anova)
     
-    i_exp = exp['identifier']
-    mbpe_ave_exp, mbpe_exp = mbpe_for_data(exp)
-    i_gaus = gaus['identifier']
-    mbpe_ave_gaus, mbpe_gaus = mbpe_for_data(gaus)
+    auc_ave_o, auc_o = auc_for_data(accuracy_original)
+    auc_ave_slf, auc_slf = auc_for_data(accuracy_surface_laplacian_filtering)
+    auc_ave_ssd, auc_ssd = auc_for_data(accuracy_spatial_spectral_decomposition)
     
-    i_pl = pl['identifier']
-    mbpe_ave_pl, mbpe_pl = mbpe_for_data(pl)
-    i_rq = rq['identifier']
-    mbpe_ave_rq, mbpe_rq = mbpe_for_data(rq)
+    auc_ave_gslf, auc_gslf = auc_for_data(accuracy_generalized_surface_laplacian_filtering)
+    auc_ave_glf, auc_glf = auc_for_data(accuracy_graph_laplacian_filtering)
     
-    data = {
-        i_exp: mbpe_exp,
-        i_gaus: mbpe_gaus,
-        i_pl: mbpe_pl,
-        i_rq: mbpe_rq,
-        
-        i_glf: mbpe_gsf,
-        i_bl: mbpe_bl,
+    auc_ave_dmrc_exp, auc_dmrc_exp = auc_for_data(accuracy_dmrc_exponential)
+    auc_ave_dmrc_rq, auc_dmrc_rq = auc_for_data(accuracy_dmrc_rational_quadratic)
+    auc_ave_dmrc_gg, auc_dmrc_gg = auc_for_data(accuracy_dmrc_generalized_gaussian)
+    auc_ave_dmrc_sig, auc_dmrc_sig = auc_for_data(accuracy_dmrc_sigmoid)
+    
+    data = {accuracy_original['identifier']: auc_o,
+            accuracy_surface_laplacian_filtering['identifier']: auc_slf,
+            accuracy_spatial_spectral_decomposition['identifier']: auc_ssd,
+            
+            accuracy_generalized_surface_laplacian_filtering['identifier']: auc_gslf,
+            accuracy_graph_laplacian_filtering['identifier']: auc_glf,
+            
+            accuracy_dmrc_exponential['identifier']: auc_dmrc_exp,
+            accuracy_dmrc_rational_quadratic['identifier']: auc_dmrc_rq,
+            accuracy_dmrc_generalized_gaussian['identifier']: auc_dmrc_gg,
+            accuracy_dmrc_sigmoid['identifier']: auc_dmrc_sig,
         }
     
     df_mean_diff, df_relative_gain, df_p_matrix, df_paired_p_matrix, df_effect_size = compare_methods(data)
     
-    plot_rel_e_heatmap(-df_effect_size, df_relative_gain)
-    plot_diff_p_heatmap(df_paired_p_matrix, df_mean_diff)
+    plot_rel_e_heatmap(df_effect_size, -df_relative_gain, 
+                       text_size=7, text_invisible=True,
+                       effect_threshould_invisible="auto",
+                       rel_threshould_invisible="auto",
+                       threshould_invisible_rate=0.7)
+    plot_diff_p_heatmap(df_paired_p_matrix, -df_mean_diff,
+                        text_size=7, text_invisible=True,
+                        diff_threshould_invisible="auto",
+                        p_threshould_invisible="auto",
+                        threshould_invisible_rate=0.7)
+    
+    return rm_anova
 
 # %% main
-if __name__ == "__main___":    
-    plot_basic_models_comparison()
+if __name__ == "__main__":    
+    rm_anova = plot_auc_comparison('pcc')
+    rm_anova = plot_auc_comparison('plv')

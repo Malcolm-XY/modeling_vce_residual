@@ -74,7 +74,7 @@ def filter_eeg_seed(identifier, freq=200, save=False, verbose=True, apply_filter
     
     return filtered_eeg_dict
 
-def filter_eeg(eeg, freq=128, verbose=False, apply_filter='surface_laplacian_filtering', kwargs=None):
+def filter_eeg(eeg, freq=200, verbose=False, apply_filter='surface_laplacian_filtering', kwargs=None):
     """
     先（可选）做 SLF / SSD（二选一），再用 MNE 分段滤波到 Delta/Theta/Alpha/Beta/Gamma。
 

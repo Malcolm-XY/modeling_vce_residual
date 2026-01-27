@@ -372,24 +372,24 @@ class FittingConfig:
     config_basic = {
         'generalized_surface_laplacian': {
             'param_names': ['sigma'],
-            'bounds': [(0.001, 5.0)],
+            'bounds': [(0.1, 5.0)],
         },
         
         'graph_laplacian_filtering': {
             'param_names': ['sigma', 'alpha'],
-            'bounds': [(0.001, 5.0), (-5.0, 5.0)], 
+            'bounds': [(0.1, 5.0), (-5.0, 5.0)], 
         },
     }
 
     config_advanced = {
         'generalized_surface_laplacian': {
             'param_names': ['sigma', 'deviation', 'offset'],
-            'bounds': [(0.001, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
+            'bounds': [(0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
         
         'graph_laplacian_filtering': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
-            'bounds': [(0.001, 5.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0)], 
+            'bounds': [(0.1, 5.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0)], 
         },
     }
 
@@ -1211,7 +1211,7 @@ if __name__ == '__main__':
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
     # %% Fitting
-    fm_model = 'advanced'
+    fm_model = 'basic'
     # fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'linear', 'linear_ratio'
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     

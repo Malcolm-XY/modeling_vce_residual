@@ -533,10 +533,10 @@ def auc_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatc
 
 # %% main
 if __name__ == "__main__":
-    # color map
-    # cmap = plt.colormaps['tab20_r']
-    cmap = plt.colormaps['viridis_r']
+    from results_plot_p_matrix import plot_auc_comparison
     
+    # color map
+    cmap = plt.colormaps['viridis_r']
     # hatchs
     hatchs = ['/', '', '', '', '', '/', '/', '/', '/'] * 10
     
@@ -546,6 +546,7 @@ if __name__ == "__main__":
     # df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
     auc_partia('pcc', cmap=cmap, hatchs=hatchs)
+    rm_anova_pcc = plot_auc_comparison('pcc')
     
     # plv
     accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs)
@@ -553,6 +554,4 @@ if __name__ == "__main__":
     # df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
     
     auc_partia('plv', cmap=cmap, hatchs=hatchs)
-    
-    # from results_plot_p_matrix import plot_basic_models_comparison
-    # plot_basic_models_comparison()
+    rm_anova_plv = plot_auc_comparison('plv')

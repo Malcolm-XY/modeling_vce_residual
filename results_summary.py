@@ -22,8 +22,8 @@ partia_accuracy_pcc = {
         + ["Generalized Surface Laplacian Filtering"] * 6
         + ["Graph Laplacian Filtering"] * 6
         
-        + ["DM-RC, Exponential Decay"] * 6
-        + ["DM-RC, Rational-Quadratic Decay"] * 6
+        + ["DM-RC, Exponential"] * 6
+        + ["DM-RC, Rational-Quadratic"] * 6
         + ["DM-RC, Generalized Gaussian"] * 6
         + ["DM-RC, Sigmoid"] * 6
     ),
@@ -66,8 +66,8 @@ partia_f1score_pcc = {
         + ["Generalized Surface Laplacian Filtering"] * 6
         + ["Graph Laplacian Filtering"] * 6
         
-        + ["DM-RC, Exponential Decay"] * 6
-        + ["DM-RC, Rational-Quadratic Decay"] * 6
+        + ["DM-RC, Exponential"] * 6
+        + ["DM-RC, Rational-Quadratic"] * 6
         + ["DM-RC, Generalized Gaussian"] * 6
         + ["DM-RC, Sigmoid"] * 6
     ),
@@ -112,8 +112,8 @@ partia_accuracy_plv = {
         + ["Generalized Surface Laplacian Filtering"] * 6
         + ["Graph Laplacian Filtering"] * 6
         
-        + ["DM-RC, Exponential Decay"] * 6
-        + ["DM-RC, Rational-Quadratic Decay"] * 6
+        + ["DM-RC, Exponential"] * 6
+        + ["DM-RC, Rational-Quadratic"] * 6
         + ["DM-RC, Generalized Gaussian"] * 6
         + ["DM-RC, Sigmoid"] * 6
     ),
@@ -158,8 +158,8 @@ partia_f1score_plv = {
         + ["Generalized Surface Laplacian Filtering"] * 6
         + ["Graph Laplacian Filtering"] * 6
         
-        + ["DM-RC, Exponential Decay"] * 6
-        + ["DM-RC, Rational-Quadratic Decay"] * 6
+        + ["DM-RC, Exponential"] * 6
+        + ["DM-RC, Rational-Quadratic"] * 6
         + ["DM-RC, Generalized Gaussian"] * 6
         + ["DM-RC, Sigmoid"] * 6
     ),

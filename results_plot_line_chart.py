@@ -120,10 +120,12 @@ def compute_error_band(m, s, *,
 def plot_lines_with_band(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs", dv: str = "data", std: str = "stds",
     ylabel: str = "YLABEL", xlabel="XLABEL",
     mode: str = "ci", level: float = 0.95, n: int | None = None, 
+    ylim=None,
     figsize=(10, 6), fontsize: int = 16, cmap=plt.colormaps['viridis'],
     use_alt_linestyles: bool = False,
     linestyles = None,
     facecolor: str = 'white',
+    legend=True,
     ) -> None: 
     # plot
     if cmap is None: 
@@ -158,6 +160,8 @@ def plot_lines_with_band(df: pd.DataFrame, identifier: str = "identifier", iv: s
 
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     ax.invert_xaxis()
     ax.grid(True, axis="y", linestyle="--", alpha=0.5)
     ax.set_facecolor(facecolor)
@@ -167,11 +171,12 @@ def plot_lines_with_band(df: pd.DataFrame, identifier: str = "identifier", iv: s
 
     ax.tick_params(axis="x", labelsize=fontsize * 0.9)
     ax.tick_params(axis="y", labelsize=fontsize * 0.9)
-
-    legend = ax.legend(fontsize=fontsize * 0.9,
-                       title=(f"Error Bands: {band_note}" if band_note is not None else ""),
-                       title_fontsize=fontsize)
-    legend.get_frame().set_facecolor(facecolor)
+    
+    if legend:
+        legend = ax.legend(fontsize=fontsize * 0.9,
+                           title=(f"Error Bands: {band_note}" if band_note is not None else ""),
+                           title_fontsize=fontsize)
+        legend.get_frame().set_facecolor(facecolor)
     
     fig.tight_layout()
     plt.show()
@@ -180,7 +185,7 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     mode: str = "sem", level: float = 0.95, n: int | None = None, 
     ylabel: str = "YLABEL", xlabel: str = "XLABEL",
     error_handle_label = None,
-    figsize = (10,10), lower_limit = 'auto', fontsize: int = 16, bar_width: float = 0.6, capsize: float = 5, 
+    figsize = (10,10), lower_limit = 'auto', upper_limit = 'auto', fontsize: int = 16, bar_width: float = 0.6, capsize: float = 5, 
     color_bar: str = "auto", bar_colors = None, cmap=plt.colormaps['viridis'],
     annotate: bool = True, annotate_fmt: str = "{m:.2f} ± {e:.2f}",
     xtick_rotation: float = 30, wrap_width: int | None = None,
@@ -233,7 +238,9 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     if annotate:
         for xx, m, e in zip(x, means, errs):
             ax.text(xx, m + e + 0.3, annotate_fmt.format(m=m, e=e),
-                    ha="center", va="bottom", fontsize=fontsize * 0.8)
+                    ha="center", va="bottom", 
+                    fontsize=fontsize * 0.8,
+                    rotation=xtick_rotation)
         
     # 坐标轴
     ax.set_xticks(x)
@@ -249,7 +256,12 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     elif isinstance(lower_limit, int):
         ymin = lower_limit
         
-    ax.set_ylim(bottom=ymin)
+    if upper_limit == 'auto':
+        ymax = min(means) + max(errs) + 5
+    elif isinstance(upper_limit, int):
+        ymax = upper_limit
+        
+    ax.set_ylim(bottom=ymin, top=ymax)
     
     # 图例
     # ax.legend([], [f"Errors: {err_note}"], fontsize=fontsize * 0.8, title_fontsize=fontsize)
@@ -266,13 +278,15 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
                                  linestyle='-', linewidth=1.5,  # 中间竖线
                                  label=error_handle_label)
     
-    ax.legend(handles=[error_handle], fontsize=fontsize * 0.8, title_fontsize=fontsize)    
+    ax.legend(handles=[error_handle], fontsize=fontsize * 0.8, title_fontsize=fontsize, loc="upper left",)
     
     fig.tight_layout()
     plt.show()
 
 def plot_bars_compact(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs", dv: str = "data", std: str = "stds",
-                      xlabel="xlabel", ylabel="ylabel", ylim=(30, 100), figsize=(12, 4.5), bar_width = 0.15, 
+                      mode: str = "sem", level: float = 0.95, n: int | None = None, 
+                      error_handle_label = None,
+                      xlabel="xlabel", ylabel="ylabel", ylim=(30, 100), figsize=(12, 4.5), fontsize = 16, bar_width = 0.15, 
                       color_bar: str = "auto", bar_colors = None, cmap=plt.colormaps['viridis'], hatchs = None):
     method_order = df[identifier].drop_duplicates().tolist()
     iv_order = df[iv].drop_duplicates().tolist()
@@ -299,11 +313,14 @@ def plot_bars_compact(df: pd.DataFrame, identifier: str = "identifier", iv: str 
     bars = []
     for i, method in enumerate(method_order):
         sub = df[df[identifier] == method].set_index(iv).loc[iv_order]
-    
+        
+        errs, _, _, err_note = compute_error_band(sub[dv], sub[std], mode=mode, level=level, n=n)
+        
         bars_ = ax.bar(
             x + i * bar_width,
             sub[dv],
-            yerr=sub[std],
+            # yerr=sub[std],
+            yerr=errs,
             width=bar_width,
             color=bar_colors[i],
             capsize=3,
@@ -320,32 +337,63 @@ def plot_bars_compact(df: pd.DataFrame, identifier: str = "identifier", iv: str 
     
     ax.set_xticks(x + bar_width * (n_methods - 1) / 2)
     ax.set_xticklabels(iv_order)
+    ax.tick_params(axis="x", labelsize=fontsize * 0.8)
+    ax.tick_params(axis="y", labelsize=fontsize * 0.8)
 
     # 左 y 轴
     ax.set_ylim(*ylim)
-    ax.set_ylabel(ylabel)
-    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel, fontsize=fontsize * 0.8)
+    ax.set_xlabel(xlabel, fontsize=fontsize * 0.8)
 
-    # ===== 右 y 轴（关键）=====
+    # ===== 右 y 轴 =====
     ax_r = ax.twinx()
     ax_r.set_ylim(*ylim)
     ax_r.set_yticks(ax.get_yticks())
     ax_r.set_yticklabels([f"{int(t)}" for t in ax.get_yticks()])
     ax_r.set_ylabel("")   # 通常不写右轴 label
 
-    # legend
-    ax.legend(
+    # Main legend
+    legend_main = ax.legend(
         loc='upper center',
+        fontsize=fontsize * 0.8,
         bbox_to_anchor=(0.5, -0.15),
         ncol=3,
         frameon=False
     )
+    
+    # Error-bar legend label
+    error_handle_label = error_handle_label or f'Errors {err_note}'
+    
+    # "H"-shaped error-bar legend handle
+    error_handle = mlines.Line2D(
+        [], [],
+        color='black',
+        marker='_',
+        markersize=3,          # cap length
+        markeredgewidth=10,    # cap thickness
+        linestyle='-',
+        linewidth=1.5,         # vertical line thickness
+        label=error_handle_label
+    )
+    
+    # Error-bar legend
+    legend_err = ax.legend(
+        handles=[error_handle],
+        fontsize=fontsize * 0.8,
+        title_fontsize=fontsize,
+        loc='upper right'
+    )
+    
+    # Ensure both legends are displayed
+    ax.add_artist(legend_main)
 
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.show()
 
 # %% -----------------------------
-def accuracy_partia(feature='pcc', model='basic', f1score=False, cmap=plt.colormaps['viridis'], hatchs = ['', '/', '', '/'] * 10):
+def accuracy_partia(feature='pcc', model='basic', f1score=False, 
+                    cmap=plt.colormaps['viridis'], hatchs = ['', '/', '', '/'] * 10,
+                    legend=True):
     # import data
     if feature == 'pcc':
         if model == 'basic':
@@ -368,13 +416,15 @@ def accuracy_partia(feature='pcc', model='basic', f1score=False, cmap=plt.colorm
                         cmap=cmap, use_alt_linestyles=True)
     
     plot_lines_with_band(df_accuracy, dv='stds', std='stds', 
-                        mode="none", 
+                        mode="none", ylim=(3, 13),
                         ylabel="Accuracy Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, use_alt_linestyles=True)
+                        cmap=cmap, use_alt_linestyles=True,
+                        legend=legend)
     
     plot_bars_compact(df_accuracy, dv='data', std='stds',
+                      mode="ci", n=30, 
                       ylabel="Average Accuracy (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                          cmap=cmap, ylim=(30, 100), figsize=(15, 5), bar_width=0.1, hatchs=hatchs)
+                      cmap=cmap, ylim=(50, 100), figsize=(18, 5), bar_width=0.1, hatchs=hatchs)
     
     # f1 score
     df_f1score=None
@@ -523,11 +573,19 @@ def auc_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatc
     auc_dic = {"AUCs": auc, "AUC_stds": auc_std}
     df_augmented = pd.concat([df_accuracy, pd.DataFrame(auc_dic)], axis=1)
 
+    # plot_bars(df_augmented, dv="AUCs", std="AUC_stds", 
+    #           mode="ci", n=30, 
+    #           color_bar="auto", cmap=cmap,
+    #           ylabel="AUC (Area Under the Curve) (%)", xlabel="",
+    #           fontsize = 18, bar_width = 0.6, 
+    #           xtick_rotation=30, wrap_width=30, figsize=(15,7.5), lower_limit=75, hatchs=hatchs)
+    
     plot_bars(df_augmented, dv="AUCs", std="AUC_stds", 
               mode="ci", n=30, 
               color_bar="auto", cmap=cmap,
-              ylabel="AUC (Area Under the Curve) (%)", xlabel="FN Recovery Methods",
-              xtick_rotation=30, wrap_width=30, figsize=(15,10), lower_limit=70, hatchs=hatchs)
+              ylabel="AUC (Area Under the Curve) (%)", xlabel="",
+              fontsize = 16 , bar_width = 0.8, 
+              xtick_rotation=45, wrap_width=25, figsize=(9,9), lower_limit=80, upper_limit=95, hatchs=hatchs)
     
     return df_augmented
 
@@ -541,7 +599,7 @@ if __name__ == "__main__":
     hatchs = ['/', '', '', '', '', '/', '/', '/', '/'] * 10
     
     # pcc
-    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', cmap=cmap, hatchs=hatchs)
+    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', cmap=cmap, hatchs=hatchs, legend=False)
     # df_sbpe = sbpe_partia('pcc', cmap=cmap)
     # df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
@@ -549,7 +607,7 @@ if __name__ == "__main__":
     rm_anova_pcc = plot_auc_comparison('pcc')
     
     # plv
-    accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs)
+    accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs, legend=True)
     # df_sbpe = sbpe_partia('plv', cmap=cmap)
     # df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
     

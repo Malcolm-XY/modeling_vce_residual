@@ -396,7 +396,7 @@ def plot_diff_p_heatmap(
         ax=ax,
         cbar=True,
         cbar_ax=cax_diff,
-        cbar_kws={"label": "Mean Difference Δ (row − col)"}
+        cbar_kws={"label": "Mean Difference Δ (col − row)"}
     )
 
     # —— 下三角 ——

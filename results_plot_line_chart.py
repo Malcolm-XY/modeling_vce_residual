@@ -482,7 +482,9 @@ def sbpe_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis']):
     
     plot_lines_with_band(df_augmented, dv='SBPEs', std='SBPE_stds', 
                         mode="ci", n=30, 
-                        ylabel='BPE (Balanced Performance Efficiency) (%)', xlabel="Node Selection Rate (for Subnetwork Extraction)",
+                        # ylabel='BPE (Balanced Performance Efficiency) (%)',
+                        ylabel='SBPE (%)',
+                        xlabel="Node Selection Rate (for Subnetwork Extraction)",
                         cmap=cmap, use_alt_linestyles=True)
     
     return df_augmented
@@ -526,11 +528,19 @@ def mbpe_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hat
     mbpe_dic = {"MBPEs": mbpe, "MBPE_stds": mbpe_std}
     df_augmented = pd.concat([df_accuracy, pd.DataFrame(mbpe_dic)], axis=1)
 
+    # plot_bars(df_augmented, dv="MBPEs", std="MBPE_stds", 
+    #           mode="ci", n=30, 
+    #           color_bar="auto", cmap=cmap,
+    #           ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="FN Recovery Methods",
+    #           xtick_rotation=30, wrap_width=30, figsize=(15,10), lower_limit=70, hatchs=hatchs)
+    
     plot_bars(df_augmented, dv="MBPEs", std="MBPE_stds", 
               mode="ci", n=30, 
               color_bar="auto", cmap=cmap,
-              ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="FN Recovery Methods",
-              xtick_rotation=30, wrap_width=30, figsize=(15,10), lower_limit=70, hatchs=hatchs)
+              # ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="",
+              ylabel="MBPE (%)", xlabel="",
+              fontsize = 16 , bar_width = 0.8, 
+              xtick_rotation=60, wrap_width=25, figsize=(9,9), lower_limit=80, upper_limit=95, hatchs=hatchs)
     
     return df_augmented
 
@@ -583,7 +593,8 @@ def auc_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hatc
     plot_bars(df_augmented, dv="AUCs", std="AUC_stds", 
               mode="ci", n=30, 
               color_bar="auto", cmap=cmap,
-              ylabel="AUC (Area Under the Curve) (%)", xlabel="",
+              # ylabel="AUC (Area Under the Curve) (%)", xlabel="",
+              ylabel="AUC (%)", xlabel="",
               fontsize = 16 , bar_width = 0.8, 
               xtick_rotation=45, wrap_width=25, figsize=(9,9), lower_limit=80, upper_limit=95, hatchs=hatchs)
     
@@ -604,7 +615,7 @@ if __name__ == "__main__":
     # df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
     auc_partia('pcc', cmap=cmap, hatchs=hatchs)
-    rm_anova_pcc = plot_auc_comparison('pcc')
+    # rm_anova_pcc = plot_auc_comparison('pcc')
     
     # plv
     accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs, legend=True)
@@ -612,4 +623,4 @@ if __name__ == "__main__":
     # df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
     
     auc_partia('plv', cmap=cmap, hatchs=hatchs)
-    rm_anova_plv = plot_auc_comparison('plv')
+    # rm_anova_plv = plot_auc_comparison('plv')

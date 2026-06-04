@@ -75,7 +75,130 @@ def draw_joint_heatmap_1d(data_dict, xticklabels=None, title="Heatmap of Channel
     plt.tight_layout()
     plt.show()
 
-def draw_projection(sample_projection, title=None):
+def draw_projection(sample_projection, title=None,
+                    xticklabels=None, yticklabels=None,
+                    show_colorbar=True, max_labels=20,
+                    title_position="upper", cmap="viridis",
+                    figsize=(6, 5),
+                    label_fontsize=10,
+                    title_fontsize=12):
+    """
+    Visualizes 2D or 3D data projections.
+
+    Parameters:
+        sample_projection (np.ndarray): 2D matrix, or 3D array where each slice
+            along axis 0 is visualized separately.
+        title (str): Optional plot title for 2D input.
+        xticklabels (list): Optional x-axis labels.
+        yticklabels (list): Optional y-axis labels.
+        show_colorbar (bool): Whether to display the color bar.
+        max_labels (int): Maximum number of displayed labels before sparsifying
+            with omission markers.
+        title_position (str): Position of the title, either "upper" or "lower".
+        cmap (str): Colormap used by imshow.
+        figsize (tuple): Figure size, e.g., (6, 5).
+        label_fontsize (int or float): Font size of x/y tick labels.
+        title_fontsize (int or float): Font size of the plot title.
+    """
+    if title is None:
+        title = "2D Matrix Visualization"
+
+    if title_position not in ["upper", "lower"]:
+        raise ValueError("title_position must be either 'upper' or 'lower'")
+
+    def sparsify_labels_with_ellipsis(labels, max_labels):
+        """
+        Return sparse tick positions and labels with '…' inserted to indicate
+        omitted regions.
+        """
+        n = len(labels)
+
+        if n == 0:
+            return [], []
+
+        if n <= max_labels:
+            return list(range(n)), list(labels)
+
+        # Keep evenly spaced labels, always including first and last
+        core_count = max(2, max_labels)
+        idx = np.linspace(0, n - 1, num=core_count, dtype=int)
+        idx = np.unique(idx).tolist()
+
+        tick_positions = []
+        tick_labels = []
+
+        prev = None
+        for current in idx:
+            if prev is not None and current - prev > 1:
+                ellipsis_pos = (prev + current) / 2
+                tick_positions.append(ellipsis_pos)
+                tick_labels.append("…")
+
+            tick_positions.append(current)
+            tick_labels.append(labels[current])
+            prev = current
+
+        return tick_positions, tick_labels
+
+    def apply_axis_labels(ax, xticks, yticks):
+        if xticks is not None:
+            x_pos, x_lab = sparsify_labels_with_ellipsis(xticks, max_labels)
+            ax.set_xticks(x_pos)
+            ax.set_xticklabels(
+                x_lab,
+                rotation=90,
+                fontsize=label_fontsize
+            )
+
+        if yticks is not None:
+            y_pos, y_lab = sparsify_labels_with_ellipsis(yticks, max_labels)
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(
+                y_lab,
+                fontsize=label_fontsize
+            )
+
+    def apply_title(ax, plot_title):
+        if title_position == "upper":
+            ax.set_title(
+                plot_title,
+                pad=10,
+                fontsize=title_fontsize
+            )
+        elif title_position == "lower":
+            ax.set_xlabel(
+                plot_title,
+                labelpad=20,
+                fontsize=title_fontsize
+            )
+
+    def plot_single(matrix, plot_title):
+        fig, ax = plt.subplots(figsize=figsize)
+        im = ax.imshow(matrix, cmap=cmap)
+
+        if show_colorbar:
+            plt.colorbar(im, ax=ax)
+
+        apply_title(ax, plot_title)
+        apply_axis_labels(ax, xticklabels, yticklabels)
+
+        plt.tight_layout()
+        plt.show()
+
+    if sample_projection.ndim == 2:
+        plot_single(sample_projection, title)
+
+    elif sample_projection.ndim == 3 and sample_projection.shape[0] <= 100:
+        for i in range(sample_projection.shape[0]):
+            plot_single(sample_projection[i], f"Channel {i + 1} Visualization")
+
+    else:
+        raise ValueError(
+            f"The dimension of sample matrix for drawing is wrong, "
+            f"shape of sample: {sample_projection.shape}"
+        )
+
+def draw_projection_(sample_projection, title=None):
     """
     Visualizes data projections (common for both datasets).
     """

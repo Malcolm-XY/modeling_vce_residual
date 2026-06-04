@@ -81,6 +81,7 @@ def auc_for_data(data_dict):
 
 # %% P-Matrices
 from scipy.stats import ttest_ind, ttest_rel
+
 def compare_methods(data, alpha=0.05):
     methods = list(data.keys())
     n = len(methods)
@@ -632,7 +633,7 @@ def plot_auc_comparison(feature='pcc'):
                        effect_threshould_invisible="auto",
                        rel_threshould_invisible="auto",
                        threshould_invisible_rate=0.7)
-    plot_diff_p_heatmap(df_paired_p_matrix, -df_mean_diff,
+    plot_diff_p_heatmap(df_p_matrix, -df_mean_diff,
                         text_size=7, text_invisible=True,
                         diff_threshould_invisible="auto",
                         p_threshould_invisible="auto",

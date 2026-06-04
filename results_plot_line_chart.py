@@ -22,28 +22,68 @@ def balanced_performance_efficiency_single_point(sr, accuracy, alpha=1, beta=1):
     return bpe
 
 def balanced_performance_efficiency_single_points(srs, accuracies, alpha=1, beta=1):
+    # bpes = []
+    # for i, sr in enumerate(srs):
+    #     bpe = alpha * (1-sr**2) * beta * accuracies[i]
+    #     bpes.append(bpe)
+    
+    costs = srs
+    performances = accuracies
+    p_max = performances[0]
+    e = 2.71828
+    k = p_max/1
     bpes = []
-    for i, sr in enumerate(srs):
-        bpe = alpha * (1-sr**2) * beta * accuracies[i]
+    for i, cost in enumerate(costs):
+        p_linear = cost * k
+        performance = performances[i]
+        r = e**(-cost)-e**(-1)
+        bpe = (performance - p_linear)*r + performance
         bpes.append(bpe)
-        
+    
     return bpes
 
 def balanced_performance_efficiency_multiple_points(srs, accuracies, alpha=1, beta=1):
-    bpe_term = []
-    normalization_term = []
-    n = len(srs) - 1
-    for i in range(n):
-         bpe_area = (srs[i] - srs[i+1]) * (accuracies[i] * (1-srs[i]**2) + accuracies[i+1] * (1-srs[i+1]**2)) * 1/2 * alpha
-         bpe_term.append(bpe_area)
+    # bpe_term = []
+    # normalization_term = []
+    # n = len(srs) - 1
+    # for i in range(n):
+    #     bpe_area = (srs[i] - srs[i+1]) * (accuracies[i] * (1-srs[i]**2) + accuracies[i+1] * (1-srs[i+1]**2)) * 1/2 * alpha
+    #     bpe_term.append(bpe_area)
          
-         normalization_area = (srs[i] - srs[i+1]) * ((1-srs[i]**2) + (1-srs[i+1]**2)) * 1/2 * beta
-         normalization_term.append(normalization_area)
+    #     normalization_area = (srs[i] - srs[i+1]) * ((1-srs[i]**2) + (1-srs[i+1]**2)) * 1/2 * beta
+    #     normalization_term.append(normalization_area)
+         
+    # bpe = np.sum(bpe_term)
+    # bpe_normalized = bpe/np.sum(normalization_term)
+    
+    # 
+    costs = srs
+    performances = accuracies
+    p_max = performances[0]
+    e = 2.71828
+    k = p_max/1
+    bpe_term = []
+    n = len(costs) - 1
+    for i in range(n):
+        dx = costs[i] - costs[i+1]
+        
+        p_linear = costs[i] * k
+        performance = performances[i]
+        r = e**(-costs[i])-e**(-1)
+        p1 = (performance - p_linear)*r + performance
+        
+        p_linear = costs[i+1] * k
+        performance = performances[i+1]
+        r = e**(-costs[i+1])-e**(-1)
+        p2 = (performance - p_linear)*r + performance
+        
+        bpe_area = dx * (p1 + p2) * 1/2
+        
+        bpe_term.append(bpe_area)
          
     bpe = np.sum(bpe_term)
-    bpe_normalized = bpe/np.sum(normalization_term)
     
-    return bpe_normalized
+    return bpe
 
 # %% -----------------------------
 import numpy as np
@@ -540,7 +580,7 @@ def mbpe_partia(feature='pcc', model='basic', cmap=plt.colormaps['viridis'], hat
               # ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="",
               ylabel="MBPE (%)", xlabel="",
               fontsize = 16 , bar_width = 0.8, 
-              xtick_rotation=60, wrap_width=25, figsize=(9,9), lower_limit=80, upper_limit=95, hatchs=hatchs)
+              xtick_rotation=50, wrap_width=25, figsize=(9,9), lower_limit=80, upper_limit=98, hatchs=hatchs)
     
     return df_augmented
 
@@ -611,16 +651,16 @@ if __name__ == "__main__":
     
     # pcc
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc', cmap=cmap, hatchs=hatchs, legend=False)
-    # df_sbpe = sbpe_partia('pcc', cmap=cmap)
-    # df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
+    df_sbpe = sbpe_partia('pcc', cmap=cmap)
+    df_mbpe = mbpe_partia('pcc', cmap=cmap, hatchs=hatchs)
     
     auc_partia('pcc', cmap=cmap, hatchs=hatchs)
-    # rm_anova_pcc = plot_auc_comparison('pcc')
+    rm_anova_pcc = plot_auc_comparison('pcc')
     
     # plv
     accuracy_plv, f1score_plv = accuracy_partia('plv', cmap=cmap, hatchs=hatchs, legend=True)
-    # df_sbpe = sbpe_partia('plv', cmap=cmap)
-    # df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
+    df_sbpe = sbpe_partia('plv', cmap=cmap)
+    df_mbpe = mbpe_partia('plv', cmap=cmap, hatchs=hatchs)
     
     auc_partia('plv', cmap=cmap, hatchs=hatchs)
-    # rm_anova_plv = plot_auc_comparison('plv')
+    rm_anova_plv = plot_auc_comparison('plv')

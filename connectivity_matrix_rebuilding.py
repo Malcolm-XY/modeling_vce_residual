@@ -67,6 +67,29 @@ def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='b
 
     return cms_rebuilt
 
+def cm_vc(distance_matrix, params, model='exponential', 
+          model_fm='basic', fm_normalization=True):
+    # 参数验证
+    supported_models = ['exponential', 'gaussian', 'inverse', 'generalized_gaussian', 'power_law', 'rational_quadratic', 'sigmoid']
+    if model not in supported_models:
+        raise ValueError(f"Unsupported model: {model}")
+    if model_fm not in ['basic', 'advanced']:
+        raise ValueError("model_fm must be 'basic' or 'advanced'")
+
+    scale_a = params.get('scale_a', 0)
+    scale_b = params.get('scale_b', 0)
+
+    # 计算距离衰减因子矩阵
+    if model_fm == 'basic':
+        factor_matrix = compute_fm_basic(distance_matrix, model, params)
+    else:
+        factor_matrix = compute_fm_advanced(distance_matrix, model, params)
+
+    if fm_normalization:
+        factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
+
+    return factor_matrix
+
 def example_usage():
     import numpy as np
     import feature_engineering
@@ -84,6 +107,27 @@ def example_usage():
     
     rcm = cm_rebuilding(cm_sample, dm, params, model, model_fm, model_rcm)
     utils_visualization.draw_projection(np.mean(rcm, axis=0), 'Rebuilded Connectivity Matrix Sample')
-
+    
 if __name__ == '__main__':
-    example_usage()
+    # example_usage()
+    
+    import numpy as np
+    import feature_engineering
+    from utils import utils_feature_loading, utils_visualization
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"})
+    dm = feature_engineering.normalize_matrix(dm)
+    utils_visualization.draw_projection(dm, 'Distance Matrix')
+    
+    cms_sample = utils_feature_loading.read_fcs('seed', 'sub1ex1', 'pcc')
+    cm_sample = cms_sample.get('alpha', '')
+    utils_visualization.draw_projection(np.mean(cm_sample, axis=0), 'Connectivity Matrix Sample')
+
+    params = {'sigma': 0.2}
+    model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
+    
+    rcm = cm_rebuilding(cm_sample, dm, params, model, model_fm, model_rcm)
+    utils_visualization.draw_projection(np.mean(rcm, axis=0), 'Rebuilded Connectivity Matrix Sample')
+    
+    # test
+    factor_matrix = compute_fm_basic(dm, model, params)
+    factor_matrix_norm = feature_engineering.normalize_matrix(factor_matrix)

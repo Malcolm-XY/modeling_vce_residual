@@ -1420,7 +1420,8 @@ def save_channel_importances(cis_fitted, save_dir='results', file_name='channel_
 if __name__ == '__main__':
     # Fittin target and DM
     channel_manual_remove = [] # [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc',
+    feature = 'plv'
+    electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs(feature,
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
     # or # electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
@@ -1431,7 +1432,7 @@ if __name__ == '__main__':
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
     results_best, cis_best, _, cis_all = fitting_model_best(fm_model, rcm_model, 
-                                                            ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
+                                                            ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=5)
     
     # %% Insert reference (LDMI) and initial ci (CM)
     ci_initial_model = np.mean(cm_global_averaged, axis=0)
@@ -1446,10 +1447,10 @@ if __name__ == '__main__':
     _, cis_sorted = process_optimized_channel_importances(cis_fitted_with_initial_reference, channel_manual_remove)
     
     # %% Save
-    path_currebt = os.getcwd()
-    results_path = os.path.join(os.getcwd(), 'fitted_results')
-    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
-    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    # path_currebt = os.getcwd()
+    # results_path = os.path.join(os.getcwd(), 'parameters_optimized')
+    # save_fitted_results(results_best, results_path, f'fitted_results(dmrc,{fm_model}_fm_{rcm_model}_rcm,{feature}).xlsx')
+    # save_channel_importances(cis_sorted, results_path, f'channel_importances(dmrc,{fm_model}_fm_{rcm_model}_rcm,{feature}).xlsx')
     
     # %% Validation of Fitted Comparison
     # joint scatter

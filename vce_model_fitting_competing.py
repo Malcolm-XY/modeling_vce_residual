@@ -1207,7 +1207,8 @@ def save_channel_importances(cis_fitted, save_dir='results', file_name='channel_
 if __name__ == '__main__':
     # Fittin target and DM
     channel_manual_remove = [] # [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc',
+    feature = 'plv'
+    electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs(feature,
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
     # %% Fitting
@@ -1231,9 +1232,9 @@ if __name__ == '__main__':
     
     # %% Save
     path_currebt = os.getcwd()
-    results_path = os.path.join(os.getcwd(), 'fitted_results')
-    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}).xlsx')
-    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}).xlsx')
+    results_path = os.path.join(os.getcwd(), 'parameters_optimized')
+    save_fitted_results(results_best, results_path, f'fitted_results(comps,{fm_model},{feature}).xlsx')
+    save_channel_importances(cis_sorted, results_path, f'channel_importances(comps,{fm_model},{feature}).xlsx')
     
     # %% Validation of Fitted Comparison
     # joint scatter

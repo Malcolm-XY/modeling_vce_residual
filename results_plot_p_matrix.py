@@ -697,7 +697,7 @@ def plot_auc_comparison(feature='pcc'):
                        text_size=7, text_invisible=True,
                        effect_threshould_invisible="auto",
                        rel_threshould_invisible="auto",
-                       threshould_invisible_rate_r=0.7,
+                       threshould_invisible_rate_r=0.2,
                        threshould_invisible_rate_e=0.2)
     plot_diff_p_heatmap(df_paired_p_matrix, -df_mean_diff,
                         text_size=7, text_invisible=True,

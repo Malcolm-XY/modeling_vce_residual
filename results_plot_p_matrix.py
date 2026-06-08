@@ -256,11 +256,13 @@ def plot_rel_e_heatmap(
     rel_vals = rel_df.values.astype(float)
     eff_vals = effect_df.values.astype(float)
 
-    rel_max = np.nanmax(np.abs(rel_vals))
-    vmin_rel, vmax_rel = -rel_max, rel_max
+    # rel_max = np.nanmax(np.abs(rel_vals))
+    # vmin_rel, vmax_rel = -rel_max, rel_max
+    vmin_rel, vmax_rel = -0.05, 0.05 # unify scales
 
-    eff_max = np.nanmax(np.abs(eff_vals))
-    vmin_eff, vmax_eff = 0.0, eff_max
+    # eff_max = np.nanmax(np.abs(eff_vals))
+    # vmin_eff, vmax_eff = 0.0, eff_max
+    vmin_eff, vmax_eff = 0.0, 2 # unify scales
 
     # —— 上三角 ——
     mask_lower = np.tril(np.ones_like(rel_vals, dtype=bool), 0)
@@ -365,12 +367,19 @@ def plot_rel_e_heatmap(
             )
 
     # —— 刻度 —— 
-    wrapped = wrap_labels(methods, width=30)
-
+    methods_y = methods.copy()
+    for index, method in enumerate(methods):
+        methods[index] = f"{index+1}." # + method
+    for index, method in enumerate(methods_y):
+        methods_y[index] = method + f".{index+1}"
+    
+    wrapped = wrap_labels(methods, width=35)
+    wrapped_y = wrap_labels(methods_y, width=35)
+    
     ax.set_xticks(np.arange(k) + 0.5)
     ax.set_xticklabels(wrapped, rotation=35, ha="left")
     ax.set_yticks(np.arange(k) + 0.5)
-    ax.set_yticklabels(wrapped)
+    ax.set_yticklabels(wrapped_y)
 
     ax.xaxis.tick_top()
     ax.tick_params(axis='x', bottom=False, top=True,
@@ -444,12 +453,14 @@ def plot_diff_p_heatmap(
     diff_vals = diff_df.values.astype(float)
     p_vals = p_df.values.astype(float)
 
-    diff_max = np.nanmax(np.abs(diff_vals))
-    vmin_diff, vmax_diff = -diff_max, diff_max
-
-    p_max = np.nanmax(np.abs(p_vals))
-    vmin_p, vmax_p = 0.0, p_max
-
+    # diff_max = np.nanmax(np.abs(diff_vals))
+    # vmin_diff, vmax_diff = -diff_max, diff_max
+    vmin_diff, vmax_diff = -4, 4 # unify scales
+    
+    # p_max = np.nanmax(np.abs(p_vals))
+    # vmin_p, vmax_p = 0.0, p_max
+    vmin_p, vmax_p = 0.0, 1 # unify scales
+    
     # —— 上三角（Δmean）——
     mask_lower = np.tril(np.ones_like(diff_vals, dtype=bool), 0)
     sns.heatmap(
@@ -552,12 +563,19 @@ def plot_diff_p_heatmap(
             )
 
     # —— 刻度 —— 
-    wrapped = wrap_labels(methods, width=30)
-
+    methods_y = methods.copy()
+    for index, method in enumerate(methods):
+        methods[index] = f"{index+1}." + method
+    for index, method in enumerate(methods_y):
+        methods_y[index] = method + f".{index+1}"
+    
+    wrapped = wrap_labels(methods, width=35)
+    wrapped_y = wrap_labels(methods_y, width=35)
+    
     ax.set_xticks(np.arange(k) + 0.5)
     ax.set_xticklabels(wrapped, rotation=35, ha="left")
     ax.set_yticks(np.arange(k) + 0.5)
-    ax.set_yticklabels(wrapped)
+    ax.set_yticklabels(wrapped_y)
 
     ax.xaxis.tick_top()
     ax.tick_params(axis='x', bottom=False, top=True,
@@ -703,7 +721,7 @@ def plot_auc_comparison(feature='pcc'):
                         text_size=7, text_invisible=True,
                         diff_threshould_invisible="auto",
                         p_threshould_invisible="auto",
-                        threshould_invisible_rate=0.7)
+                        threshould_invisible_rate=0.1)
     
     return rm_anova
 

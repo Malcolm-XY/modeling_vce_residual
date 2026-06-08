@@ -274,7 +274,7 @@ def plot_rel_e_heatmap(
         ax=ax,
         cbar=True,
         cbar_ax=cax_diff,
-        cbar_kws={"label": "Relative Increase (row / col)"}
+        cbar_kws={"label": "Relative Increase ( (col – row) / row)"}
     )
     
     cbar = ax.collections[0].colorbar
@@ -291,7 +291,7 @@ def plot_rel_e_heatmap(
         ax=ax,
         cbar=True,
         cbar_ax=cax_eff,
-        cbar_kws={"label": "Effect Size (col − row)",
+        cbar_kws={"label": "Effect Size (row − col)",
                   "orientation": "horizontal"}
     )
 

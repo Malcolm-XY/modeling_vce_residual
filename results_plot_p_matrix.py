@@ -82,7 +82,71 @@ def auc_for_data(data_dict):
 # %% P-Matrices
 from scipy.stats import ttest_ind, ttest_rel
 
+from statsmodels.stats.multitest import multipletests
 def compare_methods(data, alpha=0.05):
+    methods = list(data.keys())
+    n = len(methods)
+
+    # 初始化矩阵
+    mean_diff     = np.zeros((n, n))
+    relative_gain  = np.zeros((n, n))
+    p_matrix       = np.ones((n, n))       # 默认设为 1
+    p_corrected_mat = np.ones((n, n))      # 校正后的 p 值
+    effect_size    = np.zeros((n, n))
+
+    means = {m: np.mean(data[m]) for m in methods}
+
+    # 为了进行多重比较校正，我们需要先收集所有的原始 p 值
+    p_list = []
+    p_indices = []
+
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue # 对角线跳过
+                
+            m1, m2 = methods[i], methods[j]
+            x = np.array(data[m1])
+            y = np.array(data[m2])
+
+            # 1. 均值差与相对提升
+            mean_diff[i, j] = means[m1] - means[m2]
+            relative_gain[i, j] = (means[m1] - means[m2]) / (means[m2] + 1e-12)
+
+            # 2. 配对 t 检验 (严格对应你的 EEG 重复测量设计)
+            stat_paired, p_paired = ttest_rel(x, y)
+            p_matrix[i, j] = p_paired
+            
+            # 只记录上三角或非对角线的 p 值用于校正，避免重复计数
+            if i < j:
+                p_list.append(p_paired)
+                p_indices.append((i, j))
+
+            # 3. 配对样本的 Cohen's d 效应量
+            # 分母为两组配对差值的标准差
+            diff_std = np.std(x - y, ddof=1)
+            effect_size[i, j] = (means[m1] - means[m2]) / (diff_std + 1e-12)
+
+    # 4. 多重比较校正 (使用 FDR / Benjamini-Hochberg 方法)
+    if p_list:
+        # reject: 是否拒绝原假设, p_corrected: 校正后的 p 值
+        reject, p_corrected, _, _ = multipletests(p_list, alpha=alpha, method='fdr_bh')
+        
+        # 将校正后的 p 值填回对称矩阵中
+        for idx, (i, j) in enumerate(p_indices):
+            p_corrected_mat[i, j] = p_corrected[idx]
+            p_corrected_mat[j, i] = p_corrected[idx] # 对称位置
+
+    # 转成 DataFrame
+    df_mean_diff     = pd.DataFrame(mean_diff,     index=methods, columns=methods)
+    df_relative_gain  = pd.DataFrame(relative_gain, index=methods, columns=methods)
+    df_p_raw          = pd.DataFrame(p_matrix,      index=methods, columns=methods)
+    df_p_corrected    = pd.DataFrame(p_corrected_mat, index=methods, columns=methods)
+    df_effect_size    = pd.DataFrame(effect_size,    index=methods, columns=methods)
+
+    return df_mean_diff, df_relative_gain, df_p_raw, df_p_corrected, df_effect_size
+
+def compare_methods_(data, alpha=0.05):
     methods = list(data.keys())
     n = len(methods)
 
@@ -148,7 +212,8 @@ def plot_rel_e_heatmap(
     text_invisible=False,
     effect_threshould_invisible="auto",
     rel_threshould_invisible="auto",
-    threshould_invisible_rate=0.7,
+    threshould_invisible_rate_r=0.7,
+    threshould_invisible_rate_e=0.7
 ):
     import textwrap
 
@@ -234,9 +299,9 @@ def plot_rel_e_heatmap(
     annot = np.empty((k, k), dtype=object)
     
     if effect_threshould_invisible == "auto":
-        effect_threshould_invisible = threshould_invisible_rate * np.max(effect_df)
+        effect_threshould_invisible = threshould_invisible_rate_e * np.max(effect_df)
     if rel_threshould_invisible == "auto":
-        rel_threshould_invisible = threshould_invisible_rate * np.max(rel_df)
+        rel_threshould_invisible = threshould_invisible_rate_r * np.max(rel_df)
         
     for i in range(k):
         for j in range(k):
@@ -632,8 +697,9 @@ def plot_auc_comparison(feature='pcc'):
                        text_size=7, text_invisible=True,
                        effect_threshould_invisible="auto",
                        rel_threshould_invisible="auto",
-                       threshould_invisible_rate=0.7)
-    plot_diff_p_heatmap(df_p_matrix, -df_mean_diff,
+                       threshould_invisible_rate_r=0.7,
+                       threshould_invisible_rate_e=0.2)
+    plot_diff_p_heatmap(df_paired_p_matrix, -df_mean_diff,
                         text_size=7, text_invisible=True,
                         diff_threshould_invisible="auto",
                         p_threshould_invisible="auto",

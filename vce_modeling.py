@@ -92,7 +92,7 @@ def compute_volume_conduction_factors_basic_model(_distance_matrix, method='expo
         mu = params['mu']
         beta = params['beta']
         factor_matrix = 1.0 / (1.0 + np.exp((_distance_matrix - mu) / beta))
-
+    
     else:
         raise ValueError(f"不支持的体积电导建模方法: {method}")
 

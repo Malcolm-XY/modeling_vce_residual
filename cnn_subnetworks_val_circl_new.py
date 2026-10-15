@@ -557,9 +557,9 @@ if __name__ == '__main__':
     # [ch_index_62, ch_index_32, ch_index_16, ch_index_8, ch_index_4]
     for _list in [ch_index_32, ch_index_16, ch_index_8, ch_index_4]:
         # # Baselines
-        cnn_subnetworks_evaluation_circle_original_cm(feature_cm='pcc', normalization_for_train=True,
-                                                      subject_range=range(6,16), experiment_range=range(1,4),
-                                                      node_retention_list=_list, save=True)
+        # cnn_subnetworks_evaluation_circle_original_cm(feature_cm='pcc', normalization_for_train=True,
+        #                                               subject_range=range(6,16), experiment_range=range(1,4),
+        #                                               node_retention_list=_list, save=True)
         
         # DM-RCs
         cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', # 'basic'; 'advanced'
